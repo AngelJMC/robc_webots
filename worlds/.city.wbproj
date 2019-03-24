@@ -9,5 +9,5 @@ selectionDisabled: 0
 viewpointLocked: 0
 orthographicViewHeight: 1
 textFiles: 0 "controllers/autonomous_vehicle/autonomous_vehicle.c"
-renderingDevicePerspectives: vehicle:camera;1;2;0;0
-renderingDevicePerspectives: vehicle:display;1;1;0.677316;0.749175
+renderingDevicePerspectives: vehicle:display;0;1;0.677316;0.749175;2652;447;200;150;0
+renderingDevicePerspectives: vehicle:camera;0;2;0;0;2591;318;256;128;0

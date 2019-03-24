@@ -73,8 +73,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.9981416374257157 -0.060936619601389165 -5.3541548812559865e-06 1.9636338813438372
-  position 153.43690889076774 244.87930238199527 16.318603744161486
+  orientation -0.27925276941013105 0.8987329604659788 0.3380783290138978 1.5826645452340868
+  position 416.8755423234079 314.3719810302973 160.26305664005233
   near 1
   follow "vehicle"
   followSmoothness 0
@@ -209,7 +209,7 @@ StraightRoadSegment {
 StraightRoadSegment {
   translation 156.82999999999998 0.02 -196.47
   rotation 0 1 0 -0.7854
-  name "road(2)"
+  name "road(4)"
   id "4"
   startJunction "23"
   endJunction "22"
@@ -233,7 +233,7 @@ StraightRoadSegment {
 StraightRoadSegment {
   translation 99.55000000000001 0.02 -253.75
   rotation 0 1 0 -0.7854
-  name "road(2)"
+  name "road(5)"
   id "5"
   startJunction "23"
   endJunction "22"
@@ -257,7 +257,7 @@ StraightRoadSegment {
 StraightRoadSegment {
   translation 71.95 0.02 -54.37
   rotation 0 1 0 0.7854
-  name "road(2)"
+  name "road(6)"
   id "6"
   startJunction "23"
   endJunction "22"
@@ -281,7 +281,7 @@ StraightRoadSegment {
 CurvedRoadSegment {
   translation 64.5 0.02 -4.5
   rotation 0 1 0 0.7854
-  name "road(4)"
+  name "road(7)"
   id "7"
   startJunction "16"
   endJunction "22"
@@ -306,7 +306,7 @@ CurvedRoadSegment {
 CurvedRoadSegment {
   translation 42.64 0.02 -254.1
   rotation 0 1 0 -0.7854003061004253
-  name "road(2)"
+  name "road(8)"
   id "8"
   startJunction "16"
   endJunction "22"
@@ -331,7 +331,7 @@ CurvedRoadSegment {
 CurvedRoadSegment {
   translation -7.34 0.02 -173.10999999999999
   rotation 0 1 0 3.1416
-  name "road(6)"
+  name "road(9)"
   id "9"
   startJunction "29"
   endJunction "28"
@@ -355,7 +355,7 @@ CurvedRoadSegment {
 StraightRoadSegment {
   translation -47.830000000000005 0.02 26.889999999999997
   rotation 0 1 0 3.1416
-  name "road(7)"
+  name "road(10)"
   id "10"
   startJunction "30"
   endJunction "29"
@@ -379,7 +379,7 @@ StraightRoadSegment {
 StraightRoadSegment {
   translation -35.97 0.02 55.519999999999996
   rotation 0 -1 0 5.497779693899575
-  name "road(8)"
+  name "road(11)"
   id "11"
   startJunction "17"
   endJunction "26"
@@ -403,7 +403,7 @@ StraightRoadSegment {
 CurvedRoadSegment {
   translation 100.59 0.02 -82.97999999999999
   rotation 0 1 0 3.9266003061004255
-  name "road(11)"
+  name "road(14)"
   id "14"
   startJunction "21"
   endJunction "16"

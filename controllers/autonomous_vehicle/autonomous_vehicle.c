@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
 
   // start engine
   if (has_camera)
-    set_speed(55.0);  // km/h
+    set_speed(50.0);  // km/h
   wbu_driver_set_hazard_flashers(true);
   wbu_driver_set_dipped_beams(true);
   wbu_driver_set_antifog_lights(true);
