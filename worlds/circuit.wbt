@@ -73,8 +73,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.27925276941013105 0.8987329604659788 0.3380783290138978 1.5826645452340868
-  position 416.8755423234079 314.3719810302973 160.26305664005233
+  orientation -0.0707823186119595 -0.9843627424413888 -0.16130670991990093 2.816052815239374
+  position -83.74233966719015 24.998924506065414 -216.74550334090134
   near 1
   follow "vehicle"
   followSmoothness 0
@@ -476,6 +476,7 @@ CurvedRoadSegment {
 BmwX5 {
   translation -45.88 0.4 -150
   controller "autonomous_vehicle"
+  supervisor TRUE
   sensorsSlotFront [
     SickLms291 {
       translation 0 -2.4286129e-17 -0.06

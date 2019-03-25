@@ -1,0 +1,30 @@
+#VRML_OBJ R2019a utf8
+DistanceSensor {
+  translation 0.02 0.063 -0.042
+  rotation 0 1 0 1.1781
+  children [
+    DEF SENSOR Transform {
+      rotation 0 0 1 1.57
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.975691 0.981481 0.0252992
+            roughness 1
+            metalness 0
+          }
+          geometry Cylinder {
+            height 0.004
+            radius 0.008
+          }
+        }
+      ]
+    }
+  ]
+  name "ds0"
+  lookupTable [
+    0 1024 0
+    0.02 1024 0.1
+    0.08 0 0.3
+  ]
+  aperture 1
+}

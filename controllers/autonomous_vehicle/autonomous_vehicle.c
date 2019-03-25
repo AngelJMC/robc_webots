@@ -17,38 +17,38 @@
 /*
  * Description:   Autonoumous vehicle controller example
  */
-
+ 
+#include <webots/robot.h>
 #include <webots/camera.h>
 #include <webots/device.h>
 #include <webots/display.h>
 #include <webots/gps.h>
 #include <webots/keyboard.h>
-#include <webots/lidar.h>
-#include <webots/robot.h>
 #include <webots/vehicle/driver.h>
+#include <webots/distance_sensor.h>
+#include <webots/supervisor.h>
 
+#include <stdint.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "heuristics_algorithm.h"
 // to be used as array indices
 enum { X, Y, Z };
 
-#define TIME_STEP 50
+#define TIME_STEP 30
 #define UNKNOWN 99999.99
 
 // Line following PID
-#define KP 0.25
+#define KP 0.75
 #define KI 0.006
 #define KD 2
-
-bool PID_need_reset = false;
 
 // Size of the yellow line angle filter
 #define FILTER_SIZE 3
 
 // enabe various 'features'
-bool enable_collision_avoidance = false;
 bool enable_display = false;
 bool has_gps = false;
 bool has_camera = false;
@@ -59,11 +59,6 @@ int camera_width = -1;
 int camera_height = -1;
 double camera_fov = -1.0;
 
-// SICK laser
-WbDeviceTag sick;
-int sick_width = -1;
-double sick_range = -1.0;
-double sick_fov = -1.0;
 
 // speedometer
 WbDeviceTag display;
@@ -79,76 +74,50 @@ double gps_speed = 0.0;
 // misc variables
 double speed = 0.0;
 double steering_angle = 0.0;
-int manual_steering = 0;
-bool autodrive = true;
+
+struct pid_param{
+  double kp;
+  double ki;
+  double kd;
+  bool reset;
+};
+
+static struct pid_param pidparam;
+
+
 
 void print_help() {
   printf("You can drive this car!\n");
-  printf("Select the 3D window and then use the cursor keys to:\n");
-  printf("[LEFT]/[RIGHT] - steer\n");
   printf("[UP]/[DOWN] - accelerate/slow down\n");
 }
 
-void set_autodrive(bool onoff) {
-  if (autodrive == onoff)
-    return;
-  autodrive = onoff;
-  switch (autodrive) {
-    case false:
-      printf("switching to manual drive...\n");
-      printf("hit [A] to return to auto-drive.\n");
-      break;
-    case true:
-      if (has_camera)
-        printf("switching to auto-drive...\n");
-      else
-        printf("impossible to switch auto-drive on without camera...\n");
-      break;
-  }
-}
+
+
+
 
 // set target speed
 void set_speed(double kmh) {
   // max speed
-  if (kmh > 250.0)
-    kmh = 250.0;
-
+  if (kmh > 250.0) kmh = 250.0;
   speed = kmh;
-
-  printf("setting speed to %g km/h\n", kmh);
+  //printf("setting speed to %g km/h\n", kmh);
   wbu_driver_set_cruising_speed(kmh);
 }
+
 
 // positive: turn right, negative: turn left
 void set_steering_angle(double wheel_angle) {
   // limit the difference with previous steering_angle
-  if (wheel_angle - steering_angle > 0.1)
-    wheel_angle = steering_angle + 0.1;
-  if (wheel_angle - steering_angle < -0.1)
-    wheel_angle = steering_angle - 0.1;
+  if (wheel_angle - steering_angle > 0.1)   wheel_angle = steering_angle + 0.1;
+  if (wheel_angle - steering_angle < -0.1)  wheel_angle = steering_angle - 0.1;
   steering_angle = wheel_angle;
   // limit range of the steering angle
-  if (wheel_angle > 0.5)
-    wheel_angle = 0.5;
-  else if (wheel_angle < -0.5)
-    wheel_angle = -0.5;
+  if (wheel_angle > 0.5) wheel_angle = 0.5;
+  else if (wheel_angle < -0.5) wheel_angle = -0.5;
   wbu_driver_set_steering_angle(wheel_angle);
 }
 
-void change_manual_steer_angle(int inc) {
-  set_autodrive(false);
 
-  double new_manual_steering = manual_steering + inc;
-  if (new_manual_steering <= 25.0 && new_manual_steering >= -25.0) {
-    manual_steering = new_manual_steering;
-    set_steering_angle(manual_steering * 0.02);
-  }
-
-  if (manual_steering == 0)
-    printf("going straight\n");
-  else
-    printf("turning %.2f rad (%s)\n", steering_angle, steering_angle < 0 ? "left" : "right");
-}
 
 void check_keyboard() {
   int key = wb_keyboard_get_key();
@@ -160,16 +129,14 @@ void check_keyboard() {
       set_speed(speed - 5.0);
       break;
     case WB_KEYBOARD_RIGHT:
-      change_manual_steer_angle(+1);
       break;
     case WB_KEYBOARD_LEFT:
-      change_manual_steer_angle(-1);
       break;
     case 'A':
-      set_autodrive(true);
       break;
   }
 }
+
 
 // compute rgb difference
 int color_diff(const unsigned char a[3], const unsigned char b[3]) {
@@ -180,6 +147,7 @@ int color_diff(const unsigned char a[3], const unsigned char b[3]) {
   }
   return diff;
 }
+
 
 // returns approximate angle of yellow road line
 // or UNKNOWN if no pixel of yellow line visible
@@ -204,6 +172,7 @@ double process_camera_image(const unsigned char *image) {
 
   return ((double)sumx / pixel_count / camera_width - 0.5) * camera_fov;
 }
+
 
 // filter angle of the yellow line (simple average)
 double filter_angle(double new_value) {
@@ -231,33 +200,10 @@ double filter_angle(double new_value) {
   }
 }
 
-// returns approximate angle of obstacle
-// or UNKNOWN if no obstacle was detected
-double process_sick_data(const float *sick_data, double *obstacle_dist) {
-  const int HALF_AREA = 20;  // check 20 degrees wide middle area
-  int sumx = 0;
-  int collision_count = 0;
-  int x;
-  *obstacle_dist = 0.0;
-  for (x = sick_width / 2 - HALF_AREA; x < sick_width / 2 + HALF_AREA; x++) {
-    float range = sick_data[x];
-    if (range < 20.0) {
-      sumx += x;
-      collision_count++;
-      *obstacle_dist += range;
-    }
-  }
 
-  // if no obstacle was detected...
-  if (collision_count == 0)
-    return UNKNOWN;
-
-  *obstacle_dist = *obstacle_dist / collision_count;
-  return ((double)sumx / collision_count / sick_width - 0.5) * sick_fov;
-}
 
 void update_display() {
-  const double NEEDLE_LENGTH = 50.0;
+  const double NEEDLE_LENGTH = 60.0;
 
   // display background
   wb_display_image_paste(display, speedometer_image, 0, 0, false);
@@ -279,6 +225,7 @@ void update_display() {
   wb_display_draw_text(display, txt, 10, 140);
 }
 
+
 void compute_gps_speed() {
   const double *coords = wb_gps_get_values(gps);
   const double speed = wb_gps_get_speed(gps);
@@ -287,14 +234,15 @@ void compute_gps_speed() {
   memcpy(gps_coords, coords, sizeof(gps_coords));
 }
 
-double applyPID(double yellow_line_angle) {
+
+double applyPID(double yellow_line_angle, struct pid_param* pid ) {
   static double oldValue = 0.0;
   static double integral = 0.0;
 
-  if (PID_need_reset) {
+  if (pid->reset) {
     oldValue = yellow_line_angle;
     integral = 0.0;
-    PID_need_reset = false;
+    pid->reset = false;
   }
 
   // anti-windup mechanism
@@ -308,20 +256,25 @@ double applyPID(double yellow_line_angle) {
     integral += yellow_line_angle;
 
   oldValue = yellow_line_angle;
-  return KP * yellow_line_angle + KI * integral + KD * diff;
+  return pid->kp * yellow_line_angle + pid->ki * integral + pid->kd * diff;
+}
+
+void set_pid_param( struct pid_param* pid ){
+  pid->kp = KP;
+  pid->ki = KI;
+  pid->kd = KD;
+  pid->reset = true;
 }
 
 int main(int argc, char **argv) {
   wbu_driver_init();
-
-  // check if there is a SICK and a display
+  wb_robot_init();
+  // check if there is a display
   int j = 0;
   for (j = 0; j < wb_robot_get_number_of_devices(); ++j) {
     WbDeviceTag device = wb_robot_get_device_by_index(j);
     const char *name = wb_device_get_name(device);
-    if (strcmp(name, "Sick LMS 291") == 0)
-      enable_collision_avoidance = true;
-    else if (strcmp(name, "display") == 0)
+    if (strcmp(name, "display") == 0)
       enable_display = true;
     else if (strcmp(name, "gps") == 0)
       has_gps = true;
@@ -338,14 +291,7 @@ int main(int argc, char **argv) {
     camera_fov = wb_camera_get_fov(camera);
   }
 
-  // SICK sensor
-  if (enable_collision_avoidance) {
-    sick = wb_robot_get_device("Sick LMS 291");
-    wb_lidar_enable(sick, TIME_STEP);
-    sick_width = wb_lidar_get_horizontal_resolution(sick);
-    sick_range = wb_lidar_get_max_range(sick);
-    sick_fov = wb_lidar_get_fov(sick);
-  }
+
 
   // initialize gps
   if (has_gps) {
@@ -371,73 +317,58 @@ int main(int argc, char **argv) {
 
   // allow to switch to manual control
   wb_keyboard_enable(TIME_STEP);
-
+  
+  WbNodeRef robot_node = wb_supervisor_node_get_self();
+  WbFieldRef trans_field = wb_supervisor_node_get_field(robot_node, "translation");
+  const double *initial_pose = wb_supervisor_field_get_sf_vec3f( trans_field );
   // main loop
-  while (wbu_driver_step() != -1) {
-    // get user input
-    check_keyboard();
-    static int i = 0;
+  //while (wbu_driver_step() != -1) {
+  while(true){
+    double t;
+    set_pid_param( &pidparam );
+    printf("Param: %d \n",heuristics_loadParam() );
+    for (t = 0.0; t < 90.0; t += TIME_STEP / 1000.0) {
+      // get user input
+      // updates sensors only every TIME_STEP milliseconds
+      wb_robot_step(TIME_STEP);
+      //wbu_driver_step( );
+      
+      check_keyboard();
+      static int i = 0;
 
-    // updates sensors only every TIME_STEP milliseconds
-    if (i % (int)(TIME_STEP / wb_robot_get_basic_time_step()) == 0) {
-      // read sensors
-      const unsigned char *camera_image = NULL;
-      const float *sick_data = NULL;
-      if (has_camera)
-        camera_image = wb_camera_get_image(camera);
-      if (enable_collision_avoidance)
-        sick_data = wb_lidar_get_range_image(sick);
-
-      if (autodrive && has_camera) {
-        double yellow_line_angle = filter_angle(process_camera_image(camera_image));
-        double obstacle_dist;
-        double obstacle_angle;
-        if (enable_collision_avoidance)
-          obstacle_angle = process_sick_data(sick_data, &obstacle_dist);
-
-        // avoid obstacles and follow yellow line
-        if (enable_collision_avoidance && obstacle_angle != UNKNOWN) {
-          // an obstacle has been detected
-          wbu_driver_set_brake_intensity(0.0);
-          // compute the steering angle required to avoid the obstacle
-          double obstacle_steering = steering_angle;
-          if (obstacle_angle > 0.0 && obstacle_angle < 0.4)
-            obstacle_steering = steering_angle + (obstacle_angle - 0.25) / obstacle_dist;
-          else if (obstacle_angle > -0.4)
-            obstacle_steering = steering_angle + (obstacle_angle + 0.25) / obstacle_dist;
-          double steer = steering_angle;
-          // if we see the line we determine the best steering angle to both avoid obstacle and follow the line
+        // read sensors
+        const unsigned char *camera_image = NULL; 
+  
+        if (has_camera) {
+        
+          camera_image = wb_camera_get_image(camera);
+          double yellow_line_angle = filter_angle(process_camera_image(camera_image));
           if (yellow_line_angle != UNKNOWN) {
-            const double line_following_steering = applyPID(yellow_line_angle);
-            if (obstacle_steering > 0 && line_following_steering > 0)
-              steer = obstacle_steering > line_following_steering ? obstacle_steering : line_following_steering;
-            else if (obstacle_steering < 0 && line_following_steering < 0)
-              steer = obstacle_steering < line_following_steering ? obstacle_steering : line_following_steering;
-          } else
-            PID_need_reset = true;
-          // apply the computed required angle
-          set_steering_angle(steer);
-        } else if (yellow_line_angle != UNKNOWN) {
-          // no obstacle has been detected, simply follow the line
-          wbu_driver_set_brake_intensity(0.0);
-          set_steering_angle(applyPID(yellow_line_angle));
-        } else {
-          // no obstacle has been detected but we lost the line => we brake and hope to find the line again
-          wbu_driver_set_brake_intensity(0.4);
-          PID_need_reset = true;
+            // no obstacle has been detected, simply follow the line
+            wbu_driver_set_brake_intensity(0.0);
+            set_steering_angle( applyPID(yellow_line_angle, &pidparam ) );
+            set_speed( speed );
+          } else {
+            // no obstacle has been detected but we lost the line => we brake and hope to find the line again
+            wbu_driver_set_brake_intensity(0.4);
+            pidparam.reset = true;
+          }
         }
-      }
+  
+        // update stuff
+        if (has_gps)
+          compute_gps_speed();
+        if (enable_display)
+          update_display();
 
-      // update stuff
-      if (has_gps)
-        compute_gps_speed();
-      if (enable_display)
-        update_display();
+  
+      ++i;
     }
-
-    ++i;
+    
+    wb_supervisor_field_set_sf_vec3f(trans_field, initial_pose);
+    wb_supervisor_node_reset_physics( robot_node );
+    //wb_supervisor_simulation_reset();  
   }
-
   wbu_driver_cleanup();
 
   return 0;  // ignored
