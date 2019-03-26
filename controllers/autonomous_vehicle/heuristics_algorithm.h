@@ -1,13 +1,20 @@
 
 
 
-typedef struct var{
+struct pidparam{
   double kp;
   double ki;
   double kd;
-  double kspeed;
-}decisionVar;
+};
 
-int heuristics_loadParam();
+typedef struct var{
+  struct pidparam pidSteering;
+  struct pidparam pidSpeed;
+  double kspeed;
+}decisionVar_t;
+
+int heuristics_loadParam( decisionVar_t* var );
 
 void heuristics_update();
+
+void heutistics_checkRestrictions();
