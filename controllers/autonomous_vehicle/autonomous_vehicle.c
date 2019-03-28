@@ -23,6 +23,7 @@
 #include <webots/device.h>
 #include <webots/display.h>
 #include <webots/gps.h>
+#include <webots/accelerometer.h>
 #include <webots/keyboard.h>
 #include <webots/vehicle/driver.h>
 #include <webots/distance_sensor.h>
@@ -48,36 +49,42 @@ enum { X, Y, Z };
 
 // camera
 typedef struct {
-  WbDeviceTag         tag;
-  struct camera_param param;
+    bool                isEnabled;
+    WbDeviceTag         tag;
+    struct camera_param param;
 }camera_t;
 
 // speedometer
 typedef struct {
-  int         width ;
-  int         height;
-  WbDeviceTag tag;
-  WbImageRef  speedometer_image;
+    bool        isEnabled;
+    int         width ;
+    int         height;
+    WbDeviceTag tag;
+    WbImageRef  speedometer_image;
 }display_t;
 
 // GPS
 typedef struct {
-  double      gps_speed;
-  double      coords[3];
-  WbDeviceTag tag;
+    bool        isEnabled;
+    double      gps_speed;
+    double      coords[3];
+    WbDeviceTag tag;
 }gps_t;
 
+// acceleromenter
+typedef struct {
+    bool        isEnabled;
+    WbDeviceTag tag;
+}accel_t;
 
 
 // enabe various 'features'
-static bool       enable_display = false;
-static bool       has_gps = false;
-static bool       has_camera = false;
 static struct     pid_param pidSteering;
 static struct     pid_param pidSpeed;
 static camera_t   camera;
 static display_t  display;
 static gps_t      gps;
+static accel_t    accel;
 
 
 
@@ -117,6 +124,10 @@ void init_gps( gps_t* gps ){
     gps->gps_speed = 0;
 }
 
+void init_accelerometer( accel_t* accel ){
+    assert( NULL != accel );
+    wb_accelerometer_enable( accel->tag, TIME_STEP );
+}
 
 void update_display( display_t* disp, double* gps_coords, double gps_speed ) {
   
@@ -168,16 +179,20 @@ int main(int argc, char **argv) {
         WbDeviceTag device = wb_robot_get_device_by_index(j);
         const char *name = wb_device_get_name( device );
         if (strcmp(name, "display") == 0){
-            enable_display = true;
+            display.isEnabled = true;
             init_display( &display );
         }
         else if (strcmp(name, "gps") == 0){
-            has_gps = true;
+            gps.isEnabled = true;
             init_gps( &gps );
         }
         else if (strcmp(name, "camera") == 0){
-            has_camera = true;
+            camera.isEnabled = true;
             init_camera( &camera ); 
+        }
+        else if (strcmp(name, "acceleromenter") == 0){
+            accel.isEnabled = true;
+            init_accelerometer( &accel ); 
         }
     }
     
@@ -199,7 +214,7 @@ int main(int argc, char **argv) {
           
             wb_robot_step(TIME_STEP);   // updates sensors only every TIME_STEP milliseconds
 
-            if (has_camera) {
+            if ( camera.isEnabled ) {
                 const unsigned char *camera_image = wb_camera_get_image( camera.tag );
                 double yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
                 if (yellow_line_angle != UNKNOWN) {
@@ -217,9 +232,9 @@ int main(int argc, char **argv) {
             }
     
             // update stuff
-            if (has_gps)
+            if ( gps.isEnabled )
                 compute_gps_speed( &gps );
-            if (enable_display)
+            if ( display.isEnabled )
                 update_display( &display, gps.coords, gps.gps_speed );
         }
         

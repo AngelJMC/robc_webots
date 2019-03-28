@@ -7,6 +7,7 @@ build/release/autonomous_vehicle.o: autonomous_vehicle.c \
  /usr/local/webots/include/controller/c/webots/device.h \
  /usr/local/webots/include/controller/c/webots/display.h \
  /usr/local/webots/include/controller/c/webots/gps.h \
+ /usr/local/webots/include/controller/c/webots/accelerometer.h \
  /usr/local/webots/include/controller/c/webots/keyboard.h \
  /usr/local/webots/include/controller/c/webots/vehicle/driver.h \
  /usr/local/webots/include/controller/c/webots/types.h \
