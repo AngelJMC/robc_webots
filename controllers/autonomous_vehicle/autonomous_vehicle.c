@@ -19,6 +19,7 @@
  */
  
 #include <webots/robot.h>
+
 #include <webots/camera.h>
 #include <webots/device.h>
 #include <webots/display.h>
@@ -26,6 +27,7 @@
 #include <webots/accelerometer.h>
 #include <webots/keyboard.h>
 #include <webots/vehicle/driver.h>
+#include <webots/vehicle/car.h>
 #include <webots/distance_sensor.h>
 #include <webots/supervisor.h>
 
@@ -126,6 +128,7 @@ void init_gps( gps_t* gps ){
 
 void init_accelerometer( accel_t* accel ){
     assert( NULL != accel );
+    accel->tag = wb_robot_get_device("accelerometer");
     wb_accelerometer_enable( accel->tag, TIME_STEP );
 }
 
@@ -163,6 +166,33 @@ void compute_gps_speed( gps_t* gps ) {
 }
 
 
+void update_heuristics( statusVar_t* st ){
+    
+    enum {
+        WBU_CAR_WHEEL_FRONT_RIGHT,
+        WBU_CAR_WHEEL_FRONT_LEFT,
+        WBU_CAR_WHEEL_REAR_RIGHT,
+        WBU_CAR_WHEEL_REAR_LEFT,
+        WBU_CAR_WHEEL_NB
+    };
+    
+    double wheelradious = wbu_car_get_rear_wheel_radius( );
+    double rad = ( wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_RIGHT ) 
+                    + wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
+    st->encoder = rad * wheelradious;
+
+    st->speed = ( wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_RIGHT ) 
+                    + wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
+                    
+    const double* a = wb_accelerometer_get_values( accel.tag );
+    st->accel.x = a[0]; 
+    st->accel.x = a[1];  
+    st->accel.x = a[2];            
+    
+    heutistics_evaluate_restrictions( st );
+}
+
+
 int main(int argc, char **argv) {
     
     wb_robot_init();
@@ -190,7 +220,7 @@ int main(int argc, char **argv) {
             camera.isEnabled = true;
             init_camera( &camera ); 
         }
-        else if (strcmp(name, "acceleromenter") == 0){
+        else if (strcmp(name, "accelerometer") == 0){
             accel.isEnabled = true;
             init_accelerometer( &accel ); 
         }
@@ -201,19 +231,21 @@ int main(int argc, char **argv) {
 
     /* Run simulation */
     while(true){
+        wbu_car_init();
         decisionVar_t decvar;
+        statusVar_t stvar;
         /* Load the value of decision variables from heuristic algorithm */
         int nsim = heuristics_loadParam( &decvar );
         printf("Param: %d \n",nsim);
         
         set_pid_param( &pidSteering, &decvar.pidSteering );
         set_pid_param( &pidSpeed, &decvar.pidSpeed );
-
+  
         /* Execute a new simulation */
         for (double t = 0.0; t < 90.0; t += TIME_STEP / 1000.0) {
           
             wb_robot_step(TIME_STEP);   // updates sensors only every TIME_STEP milliseconds
-
+            
             if ( camera.isEnabled ) {
                 const unsigned char *camera_image = wb_camera_get_image( camera.tag );
                 double yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
@@ -236,16 +268,22 @@ int main(int argc, char **argv) {
                 compute_gps_speed( &gps );
             if ( display.isEnabled )
                 update_display( &display, gps.coords, gps.gps_speed );
+            if (accel.isEnabled )
+
+            update_heuristics( &stvar );
+
         }
         
         /*Return to initial position*/
         wb_supervisor_field_set_sf_vec3f( trans_field, initial_trans );
         wb_supervisor_field_set_sf_rotation( rotation_field, initial_rotation );
         wb_supervisor_node_reset_physics( robot_node );
-        //wb_supervisor_simulation_reset(); 
+        wb_supervisor_simulation_reset(); 
+        //wbu_car_cleanup();
         
     }
     wbu_driver_cleanup(); 
+    //wbu_car_cleanup();
 
     return 0;  // ignored
 }

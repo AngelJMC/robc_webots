@@ -31,3 +31,8 @@ void heuristics_update( ){
 
 void heutistics_checkRestrictions(){
 }
+
+void heutistics_evaluate_restrictions( statusVar_t* st ){
+
+  
+}
