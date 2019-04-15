@@ -67,7 +67,7 @@ PROTO BmwX5 [
     trackFront 1.628
     trackRear 1.628
     wheelbase 2.995
-    time0To100 7
+    time0To100 2
     engineMinRPM 1000
     engineMaxRPM 6500
     brakeCoefficient 1800  # calibrated for braking from 100 to 0km/h in 36.5m

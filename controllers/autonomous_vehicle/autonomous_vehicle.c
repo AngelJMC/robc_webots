@@ -244,7 +244,7 @@ int main(int argc, char **argv) {
         /* Execute a new simulation */
         for (double t = 0.0; t < 90.0; t += TIME_STEP / 1000.0) {
           
-            wb_robot_step(TIME_STEP);   // updates sensors only every TIME_STEP milliseconds
+            wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
             
             if ( camera.isEnabled ) {
                 const unsigned char *camera_image = wb_camera_get_image( camera.tag );

@@ -13,13 +13,13 @@ static int count = 1;
 
 int heuristics_loadParam( decisionVar_t* var ){
 
-  var->pidSteering.kp = 2;
-  var->pidSteering.ki = 0.006;
-  var->pidSteering.kd = 0.75;
+  var->pidSteering.kp = 1.5;
+  var->pidSteering.ki = 0.0002;
+  var->pidSteering.kd = 0;
 
   var->pidSpeed.kp = 1;
-  var->pidSpeed.ki = 0.006;
-  var->pidSpeed.kd = 1;
+  var->pidSpeed.ki = 0.0001;
+  var->pidSpeed.kd = 5;
 
 
   count++;

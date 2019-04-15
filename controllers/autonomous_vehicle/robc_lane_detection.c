@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 // Size of the yellow line angle filter
-#define FILTER_SIZE 3
+#define FILTER_SIZE 2
 #define UNKNOWN 99999.99
 
 
