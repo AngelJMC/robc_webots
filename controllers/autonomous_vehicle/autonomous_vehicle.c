@@ -82,22 +82,12 @@ typedef struct {
 
 // enabe various 'features'
 static struct     pid_param pidSteering;
-static struct     pid_param pidSpeed;
+static struct     speedcrl speedcrl;
 static camera_t   camera;
 static display_t  display;
 static gps_t      gps;
 static accel_t    accel;
 
-
-
-void set_pid_param( struct pid_param* pid, struct pidparam* decvar ){
-    pid->oldValue = 0.0;
-    pid->integral = 0.0;
-    pid->kp = decvar->kp;
-    pid->ki = decvar->ki;
-    pid->kd = decvar->kd;
-    pid->reset = true;
-}
 
 
 void init_camera( camera_t* cam ){
@@ -166,7 +156,7 @@ void compute_gps_speed( gps_t* gps ) {
 }
 
 
-void update_heuristics( statusVar_t* st ){
+void update_heuristics( statusVar_t* st, bool finishCycle ){
     
     enum {
         WBU_CAR_WHEEL_FRONT_RIGHT,
@@ -181,15 +171,19 @@ void update_heuristics( statusVar_t* st ){
                     + wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
     st->encoder = rad * wheelradious;
 
+#if 0
     st->speed = ( wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_RIGHT ) 
                     + wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
-                    
+#endif
+
+    st->speed = wbu_driver_get_current_speed();
+
     const double* a = wb_accelerometer_get_values( accel.tag );
-    st->accel.x = a[0]; 
-    st->accel.x = a[1];  
-    st->accel.x = a[2];            
-    
-    heutistics_evaluate_restrictions( st );
+    st->accel.y = a[0];  
+    st->accel.z = a[1];            
+    st->accel.x = a[2]; 
+
+    heutistics_evaluate_restrictions( st, finishCycle );
 }
 
 
@@ -236,13 +230,14 @@ int main(int argc, char **argv) {
         statusVar_t stvar;
         /* Load the value of decision variables from heuristic algorithm */
         int nsim = heuristics_loadParam( &decvar );
-        printf("Param: %d \n",nsim);
+        printf("Num simulation: %d \n",nsim);
         
-        set_pid_param( &pidSteering, &decvar.pidSteering );
-        set_pid_param( &pidSpeed, &decvar.pidSpeed );
+        init_speedParam(  &speedcrl, decvar.a , decvar.b, decvar.brakelimit  );
+        init_steeringParam(  &pidSteering, decvar.kp, decvar.ki, decvar.kd );
+    
   
         /* Execute a new simulation */
-        for (double t = 0.0; t < 90.0; t += TIME_STEP / 1000.0) {
+        for (double t = 0.0; t <= 90.0; t += TIME_STEP / 1000.0) {
           
             wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
             
@@ -252,7 +247,7 @@ int main(int argc, char **argv) {
                 if (yellow_line_angle != UNKNOWN) {
                     // no obstacle has been detected, simply follow the line
                     //wbu_driver_set_brake_intensity(0.0);
-                    set_speed( &pidSpeed, yellow_line_angle );
+                    set_speed( &speedcrl, yellow_line_angle );
                     //printf("Yellow angle: %f \n",yellow_line_angle);
                     set_steering_angle( &pidSteering, yellow_line_angle );
                     
@@ -268,12 +263,13 @@ int main(int argc, char **argv) {
                 compute_gps_speed( &gps );
             if ( display.isEnabled )
                 update_display( &display, gps.coords, gps.gps_speed );
-            if (accel.isEnabled )
 
-            update_heuristics( &stvar );
+            bool lastCycle = t >= 89.93;
+            printf( "Step: %f \r\n", t);
+            update_heuristics( &stvar , lastCycle  );
 
         }
-        
+
         /*Return to initial position*/
         wb_supervisor_field_set_sf_vec3f( trans_field, initial_trans );
         wb_supervisor_field_set_sf_rotation( rotation_field, initial_rotation );

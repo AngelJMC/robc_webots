@@ -510,6 +510,7 @@ BmwX5 {
   ]
   sensorsSlotCenter [
     Accelerometer {
+      rotation 1 0 0 0
     }
     GPS {
     }

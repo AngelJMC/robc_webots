@@ -1,16 +1,23 @@
 
 
+#ifndef HEURISTICS_ALGORITHM_H
+#define HEURISTICS_ALGORITHM_H
 
-struct pidparam{
-  double kp;
-  double ki;
-  double kd;
-};
+#include <stdbool.h>
+#include <stdint.h>
+
 
 typedef struct var{
-  struct pidparam pidSteering;
-  struct pidparam pidSpeed;
-  double kspeed;
+
+    double kp;
+    double ki;
+    double kd;
+
+
+    double a;
+    double b;
+    double brakelimit;
+
 }decisionVar_t;
 
 typedef struct {
@@ -23,8 +30,9 @@ typedef struct {
   double encoder;
 } statusVar_t;
 
+
 int heuristics_loadParam( decisionVar_t* var );
 
-void heuristics_update();
+void heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle );
 
-void heutistics_evaluate_restrictions( statusVar_t* st );
+#endif /*HEURISTICS_ALGORITHM_H*/
