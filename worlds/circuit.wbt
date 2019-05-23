@@ -72,7 +72,7 @@ WorldInfo {
     }
   ]
 }
-Viewpoint {
+DEF viewp Viewpoint {
   orientation -0.11882902219809233 -0.9800208654980207 -0.15949535000104456 2.3463550403658435
   position -101.92928313556949 24.83124320623642 -193.64855617880534
   near 1
@@ -474,7 +474,7 @@ CurvedRoadSegment {
   totalAngle 3.1416
 }
 BmwX5 {
-  translation -45.88 0.4 -150
+  translation -45.9 0.308 -150
   controller "autonomous_vehicle"
   supervisor TRUE
   sensorsSlotFront [

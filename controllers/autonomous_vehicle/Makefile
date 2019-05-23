@@ -24,7 +24,7 @@ space :=
 space +=
 WEBOTS_HOME_PATH=$(subst $(space),\ ,$(strip $(subst \,/,$(WEBOTS_HOME))))
 
-LIBRARIES = -ldriver -lcar
+LIBRARIES = -ldriver -lcar -lgsl -lgslcblas
 CFLAGS = -Wall
 
 # Do not modify the following: this includes Webots global Makefile.include

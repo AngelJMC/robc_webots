@@ -36,10 +36,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "heuristics_algorithm.h"
 #include "robc_lane_detection.h"
 #include "robc_control.h"
+
 
 // to be used as array indices
 enum { X, Y, Z };
@@ -155,8 +157,27 @@ void compute_gps_speed( gps_t* gps ) {
     memcpy(gps->coords, coords, sizeof(gps->coords));
 }
 
+void status_init( statusVar_t* st ){
+    
+    enum {
+        WBU_CAR_WHEEL_FRONT_RIGHT,
+        WBU_CAR_WHEEL_FRONT_LEFT,
+        WBU_CAR_WHEEL_REAR_RIGHT,
+        WBU_CAR_WHEEL_REAR_LEFT,
+        WBU_CAR_WHEEL_NB
+    };
+    
+    st->angle = 0;
+    st->accel.y = 0;  
+    st->accel.z = 0;            
+    st->accel.x = 0;
+    double rad = ( wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_RIGHT ) 
+                    + wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
+    st->offsetRad = isnan(rad) ? 0.0 : rad;
+    st->dist = 0;
+}
 
-void update_heuristics( statusVar_t* st, bool finishCycle ){
+void status_update( statusVar_t* st , double angle){
     
     enum {
         WBU_CAR_WHEEL_FRONT_RIGHT,
@@ -169,8 +190,8 @@ void update_heuristics( statusVar_t* st, bool finishCycle ){
     double wheelradious = wbu_car_get_rear_wheel_radius( );
     double rad = ( wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_RIGHT ) 
                     + wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
-    st->encoder = rad * wheelradious;
-
+    st->dist = fabs( rad - st->offsetRad ) * wheelradious;
+    st->angle = angle;
 #if 0
     st->speed = ( wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_RIGHT ) 
                     + wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
@@ -182,13 +203,62 @@ void update_heuristics( statusVar_t* st, bool finishCycle ){
     st->accel.y = a[0];  
     st->accel.z = a[1];            
     st->accel.x = a[2]; 
+}
 
-    heutistics_evaluate_restrictions( st, finishCycle );
+double get_travelled_distance( statusVar_t* st  ){
+    return st->dist;
 }
 
 
+void run_simulation( decisionVar_t* decvar , statusVar_t* stvar )
+{
+        stvar->numfail = 0;
+        init_speedParam(  &speedcrl, decvar->var.a.x, decvar->var.b.x, decvar->var.brakelimit.x  );
+        init_steeringParam(  &pidSteering, decvar->var.kp.x, decvar->var.ki.x, 0.0 );
+        wbu_car_init();
+        status_init( stvar );
+        /* Execute a new simulation */
+        for (double t = 0.0; t <= 90.0; t += TIME_STEP / 1000.0) {
+          
+            wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
+            double yellow_line_angle = UNKNOWN;
+            if ( camera.isEnabled ) {
+                const unsigned char *camera_image = wb_camera_get_image( camera.tag );
+                yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
+                if (yellow_line_angle != UNKNOWN) {
+                    // no obstacle has been detected, simply follow the line
+                    set_speed( &speedcrl, yellow_line_angle );
+                    set_steering_angle( &pidSteering, yellow_line_angle );
+                    
+                }else {
+                    // no obstacle has been detected but we lost the line => we brake and hope to find the line again
+                    wbu_driver_set_brake_intensity(0.4);
+                    pidSteering.reset = true;
+                }
+            }
+    
+            // update stuff
+            if ( gps.isEnabled )
+                compute_gps_speed( &gps );
+            if ( display.isEnabled )
+                update_display( &display, gps.coords, gps.gps_speed );
+
+            status_update( stvar, yellow_line_angle );
+            bool const lastCycle = t >= 89.93;
+            bool res = heutistics_evaluate_restrictions( stvar, lastCycle );
+            if ( !res ) { 
+                break; }
+        }
+
+
+}
+
 int main(int argc, char **argv) {
     
+    decisionVar_t decvar;
+    decisionVar_t bestvar;
+    neighbor_t nbh[NVAR];
+
     wb_robot_init();
     
     WbNodeRef robot_node = wb_supervisor_node_get_self();
@@ -197,7 +267,11 @@ int main(int argc, char **argv) {
     WbFieldRef rotation_field = wb_supervisor_node_get_field(robot_node, "rotation");
     const double *initial_rotation = wb_supervisor_field_get_sf_rotation( rotation_field );
 
-    
+    WbNodeRef vw_node = wb_supervisor_node_get_from_def("viewp");
+    WbFieldRef vw_trans_field = wb_supervisor_node_get_field(vw_node, "position");
+    const double *trans = wb_supervisor_field_get_sf_vec3f(vw_trans_field);
+    printf("MY_ROBOT is at position: %g %g %g\n", trans[0], trans[1], trans[2]);
+
     // check devices
     for (int j = 0; j < wb_robot_get_number_of_devices(); ++j) {
         WbDeviceTag device = wb_robot_get_device_by_index(j);
@@ -220,64 +294,60 @@ int main(int argc, char **argv) {
         }
     }
     
+    heuristics_init( &decvar );
+    memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+    
+    static int iter = 0;
+    static double bestrsl = 0;
+    static double dist = 0;
     // start engine
     robc_startEngine( );
-
     /* Run simulation */
     while(true){
-        wbu_car_init();
-        decisionVar_t decvar;
-        statusVar_t stvar;
         /* Load the value of decision variables from heuristic algorithm */
-        int nsim = heuristics_loadParam( &decvar );
-        printf("Num simulation: %d \n",nsim);
+        //int nsim = heuristics_loadParam( &decvar );
+        printf("Num simulation:  \n");
+        heuristics_generate_neighbor( nbh, &bestvar );
         
-        init_speedParam(  &speedcrl, decvar.a , decvar.b, decvar.brakelimit  );
-        init_steeringParam(  &pidSteering, decvar.kp, decvar.ki, decvar.kd );
-    
-  
-        /* Execute a new simulation */
-        for (double t = 0.0; t <= 90.0; t += TIME_STEP / 1000.0) {
-          
-            wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
+        int bestiter = -1;
+        for( iter = 0; iter < POINTS_NBH; ++iter ){
+            statusVar_t stvar;
+            heuristics_get_neighbor( &decvar, &nbh[iter] );
+            heutistics_print_point( &decvar );
             
-            if ( camera.isEnabled ) {
-                const unsigned char *camera_image = wb_camera_get_image( camera.tag );
-                double yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
-                if (yellow_line_angle != UNKNOWN) {
-                    // no obstacle has been detected, simply follow the line
-                    //wbu_driver_set_brake_intensity(0.0);
-                    set_speed( &speedcrl, yellow_line_angle );
-                    //printf("Yellow angle: %f \n",yellow_line_angle);
-                    set_steering_angle( &pidSteering, yellow_line_angle );
-                    
-                }else {
-                    // no obstacle has been detected but we lost the line => we brake and hope to find the line again
-                    wbu_driver_set_brake_intensity(0.4);
-                    pidSteering.reset = true;
-                }
+            run_simulation( &decvar, &stvar );
+            dist = get_travelled_distance( &stvar );
+            if ( dist > bestrsl ){
+                bestiter = iter;
+                bestrsl = dist;
             }
-    
-            // update stuff
-            if ( gps.isEnabled )
-                compute_gps_speed( &gps );
-            if ( display.isEnabled )
-                update_display( &display, gps.coords, gps.gps_speed );
-
-            bool lastCycle = t >= 89.93;
-            printf( "Step: %f \r\n", t);
-            update_heuristics( &stvar , lastCycle  );
+            printf("Iter: %d, distance: %f, best distance: %f\r\n", iter, dist, bestrsl ); 
+            
+            /*Return to initial position*/
+            wb_supervisor_field_set_sf_vec3f( trans_field, initial_trans );
+            wb_supervisor_field_set_sf_rotation( rotation_field, initial_rotation );
+            wb_supervisor_field_set_sf_vec3f( vw_trans_field, trans );
+            wb_supervisor_node_reset_physics( robot_node );
+            
+            //wbu_car_cleanup();
 
         }
 
-        /*Return to initial position*/
-        wb_supervisor_field_set_sf_vec3f( trans_field, initial_trans );
-        wb_supervisor_field_set_sf_rotation( rotation_field, initial_rotation );
-        wb_supervisor_node_reset_physics( robot_node );
-        wb_supervisor_simulation_reset(); 
-        //wbu_car_cleanup();
+        if( bestiter != -1 ){
+            printf("Best: [%d], distance: %f\r\n", bestiter, bestrsl); 
+            heuristics_get_neighbor( &decvar, &nbh[bestiter] );
+            memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+        }
         
+        
+
+
     }
+    
+    //wb_supervisor_simulation_reset(); 
+
+
+
     wbu_driver_cleanup(); 
     //wbu_car_cleanup();
 
