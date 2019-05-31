@@ -14,4 +14,4 @@ build/release/autonomous_vehicle.o: autonomous_vehicle.c \
  /usr/local/webots/include/controller/c/webots/vehicle/car.h \
  /usr/local/webots/include/controller/c/webots/distance_sensor.h \
  /usr/local/webots/include/controller/c/webots/supervisor.h \
- heuristics_algorithm.h robc_lane_detection.h robc_control.h
+ heuristics_algorithm.h robc_lane_detection.h robc_control.h tabu_list.h

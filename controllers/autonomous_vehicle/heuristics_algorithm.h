@@ -34,6 +34,7 @@ struct dvar{
   double xl;   //lower limit
   double xu;   // uper limit
   double x;
+  int    range;
 };
 
 typedef union
@@ -48,6 +49,7 @@ typedef union
   }var;
   struct dvar list[NVAR];
 }decisionVar_t;
+
 
 typedef struct {
   double speed;
@@ -68,6 +70,7 @@ void heuristics_loadDefault( decisionVar_t* var );
 int heuristics_loadParam( decisionVar_t* var );
 
 void heuristics_generate_neighbor( neighbor_t* nbh, decisionVar_t* var );
+void heuristics_generate_neighbor_close( neighbor_t* nbh, decisionVar_t* var );
 
 void heuristics_init( decisionVar_t* var );
 
@@ -76,5 +79,9 @@ bool heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle );
 void heuristics_get_neighbor( decisionVar_t* var, neighbor_t* nbh );
 
 void heutistics_print_point( decisionVar_t* var );
+
+void heuristics_update_range( decisionVar_t* var );
+
+int heuristics_get_range( decisionVar_t* var );
 
 #endif /*HEURISTICS_ALGORITHM_H*/

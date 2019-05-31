@@ -37,10 +37,12 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <float.h>
 
 #include "heuristics_algorithm.h"
 #include "robc_lane_detection.h"
 #include "robc_control.h"
+#include "tabu_list.h"
 
 
 // to be used as array indices
@@ -81,6 +83,19 @@ typedef struct {
     WbDeviceTag tag;
 }accel_t;
 
+struct wb_node{
+    WbFieldRef      field;
+    const double*   value;
+};
+
+
+struct nodeHdlr{
+    WbNodeRef      carNode;
+    struct wb_node  carTrans;
+    struct wb_node  carRot;
+    WbNodeRef       viewNode;
+    struct wb_node  viewPos;
+};
 
 // enabe various 'features'
 static struct     pid_param pidSteering;
@@ -90,6 +105,8 @@ static display_t  display;
 static gps_t      gps;
 static accel_t    accel;
 
+
+void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar );
 
 
 void init_camera( camera_t* cam ){
@@ -210,67 +227,106 @@ double get_travelled_distance( statusVar_t* st  ){
 }
 
 
-void run_simulation( decisionVar_t* decvar , statusVar_t* stvar )
+bool check_best_solution( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar, double bestdist ){
+
+    //double maxdist = fmax( dist, 0.0 );
+    //double mindist = fmin( dist, DBL_MAX );
+
+    printf(" ---- Validate new solution ---- \n" );
+    printf("        Val %d  -> dist: %f\n",  0, bestdist );
+    for ( int i = 0; i < 2; ++i ){
+        run_simulation( nh, decvar , stvar );
+        double const dist = get_travelled_distance( stvar );
+        //maxdist = fmax( dist, maxdist );
+        //mindist = fmin( dist, mindist );
+        printf("        Val %d  -> dist: %f\n",  i +1, dist );
+        if ( (bestdist - dist) > 20.0 ) return false;
+    }
+    //printf("        ----> Diff %f \n",  fabs( maxdist - mindist) );
+    return true;
+    
+}
+
+void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar )
 {
         stvar->numfail = 0;
         init_speedParam(  &speedcrl, decvar->var.a.x, decvar->var.b.x, decvar->var.brakelimit.x  );
         init_steeringParam(  &pidSteering, decvar->var.kp.x, decvar->var.ki.x, 0.0 );
-        wbu_car_init();
+        //wbu_car_init();
+
+        /*Return to initial position*/       
+        wb_supervisor_field_set_sf_vec3f( nh->carTrans.field, nh->carTrans.value );
+        wb_supervisor_field_set_sf_rotation( nh->carRot.field, nh->carRot.value );
+        wb_supervisor_field_set_sf_vec3f( nh->viewPos.field, nh->viewPos.value );
+        wb_supervisor_node_reset_physics( nh->carNode );
+
+        wbu_driver_set_cruising_speed( 0.0 );
+        wbu_driver_set_steering_angle( 0.0 );
+        wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
+
         status_init( stvar );
         /* Execute a new simulation */
         for (double t = 0.0; t <= 90.0; t += TIME_STEP / 1000.0) {
           
             wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
-            double yellow_line_angle = UNKNOWN;
             if ( camera.isEnabled ) {
                 const unsigned char *camera_image = wb_camera_get_image( camera.tag );
-                yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
-                if (yellow_line_angle != UNKNOWN) {
-                    // no obstacle has been detected, simply follow the line
-                    set_speed( &speedcrl, yellow_line_angle );
-                    set_steering_angle( &pidSteering, yellow_line_angle );
-                    
-                }else {
-                    // no obstacle has been detected but we lost the line => we brake and hope to find the line again
-                    wbu_driver_set_brake_intensity(0.4);
-                    pidSteering.reset = true;
-                }
+                double const yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
+                double const angle = yellow_line_angle != UNKNOWN ? yellow_line_angle : stvar->angle;
+                set_speed( &speedcrl, angle );
+                set_steering_angle( &pidSteering, angle );
+                status_update( stvar, angle );
             }
     
-            // update stuff
             if ( gps.isEnabled )
                 compute_gps_speed( &gps );
             if ( display.isEnabled )
                 update_display( &display, gps.coords, gps.gps_speed );
 
-            status_update( stvar, yellow_line_angle );
+            
             bool const lastCycle = t >= 89.93;
             bool res = heutistics_evaluate_restrictions( stvar, lastCycle );
             if ( !res ) { 
+                //wbu_car_cleanup();
+                wbu_driver_set_cruising_speed( 0.0 );
+                wbu_driver_set_steering_angle( 0.0 );
+                wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
+
                 break; }
         }
 
 
+
 }
+
+
+
 
 int main(int argc, char **argv) {
     
     decisionVar_t decvar;
     decisionVar_t bestvar;
     neighbor_t nbh[NVAR];
+    struct nodeHdlr nh;
+    static tabuhdlr_t htbu;
 
     wb_robot_init();
+    tabulist_init( &htbu );
     
-    WbNodeRef robot_node = wb_supervisor_node_get_self();
-    WbFieldRef trans_field = wb_supervisor_node_get_field(robot_node, "translation");
-    const double *initial_trans = wb_supervisor_field_get_sf_vec3f( trans_field );
-    WbFieldRef rotation_field = wb_supervisor_node_get_field(robot_node, "rotation");
-    const double *initial_rotation = wb_supervisor_field_get_sf_rotation( rotation_field );
+    
+    nh.carNode = wb_supervisor_node_get_self();
 
-    WbNodeRef vw_node = wb_supervisor_node_get_from_def("viewp");
-    WbFieldRef vw_trans_field = wb_supervisor_node_get_field(vw_node, "position");
-    const double *trans = wb_supervisor_field_get_sf_vec3f(vw_trans_field);
-    printf("MY_ROBOT is at position: %g %g %g\n", trans[0], trans[1], trans[2]);
+    nh.carTrans.field = wb_supervisor_node_get_field( nh.carNode, "translation");
+    nh.carTrans.value = wb_supervisor_field_get_sf_vec3f( nh.carTrans.field );
+
+    nh.carRot.field = wb_supervisor_node_get_field(nh.carNode, "rotation");
+    nh.carRot.value = wb_supervisor_field_get_sf_rotation( nh.carRot.field );
+
+    nh.viewNode = wb_supervisor_node_get_from_def("viewp");
+
+    nh.viewPos.field = wb_supervisor_node_get_field( nh.viewNode, "position");
+    nh.viewPos.value = wb_supervisor_field_get_sf_vec3f( nh.viewPos.field );
+
 
     // check devices
     for (int j = 0; j < wb_robot_get_number_of_devices(); ++j) {
@@ -303,43 +359,92 @@ int main(int argc, char **argv) {
     // start engine
     robc_startEngine( );
     /* Run simulation */
+    int baditers = 0;
+    int iter_all = 0;
+    bool add_tabu = false;
+    bool restart_search = false;
     while(true){
         /* Load the value of decision variables from heuristic algorithm */
         //int nsim = heuristics_loadParam( &decvar );
-        printf("Num simulation:  \n");
-        heuristics_generate_neighbor( nbh, &bestvar );
-        
         int bestiter = -1;
+
+        if( restart_search ){
+            restart_search = false;
+            baditers = 0;
+            bestrsl = 0;
+            heuristics_init( &decvar );
+            memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+        }
+        
+        int iter_range = heuristics_get_range( &decvar);
+        printf("Num simulation:  \n");
+        if ( iter_range < 128 )
+            heuristics_generate_neighbor( nbh, &bestvar );
+        else{
+            heuristics_generate_neighbor_close( nbh, &bestvar );
+            add_tabu = ( iter_range >= 2048 );
+        }
+        
+        
+        
         for( iter = 0; iter < POINTS_NBH; ++iter ){
+            
             statusVar_t stvar;
+            ++iter_all;
             heuristics_get_neighbor( &decvar, &nbh[iter] );
             heutistics_print_point( &decvar );
             
-            run_simulation( &decvar, &stvar );
+            run_simulation( &nh, &decvar, &stvar );
             dist = get_travelled_distance( &stvar );
-            if ( dist > bestrsl ){
-                bestiter = iter;
-                bestrsl = dist;
-            }
+
             printf("Iter: %d, distance: %f, best distance: %f\r\n", iter, dist, bestrsl ); 
             
-            /*Return to initial position*/
-            wb_supervisor_field_set_sf_vec3f( trans_field, initial_trans );
-            wb_supervisor_field_set_sf_rotation( rotation_field, initial_rotation );
-            wb_supervisor_field_set_sf_vec3f( vw_trans_field, trans );
-            wb_supervisor_node_reset_physics( robot_node );
+
             
-            //wbu_car_cleanup();
+            if ( dist > bestrsl && dist > 250.0 ){
+                bool res = check_best_solution(  &nh, &decvar , &stvar, dist );
+                if( res ){
+                    bestiter = iter;
+                    bestrsl = dist;
+                    baditers = 0;
+                    break;
+                }
+            }
+            else if( dist > 100.0 ){
+                ++baditers;
+            }
+
+            if( baditers >= 14 ){
+                heuristics_update_range( &decvar );
+                baditers = 0;
+            }
+
+            printf("num Iter: %d, bad iter: %d\r\n", iter_all, baditers); 
 
         }
 
         if( bestiter != -1 ){
             printf("Best: [%d], distance: %f\r\n", bestiter, bestrsl); 
             heuristics_get_neighbor( &decvar, &nbh[bestiter] );
-            memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+            int istabu = tabulist_isinlist( &htbu, &decvar );
+            if( !istabu )
+                memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+            else 
+                restart_search = true;
+            
         }
-        
-        
+
+        if( add_tabu ){
+            //Reset algoritmo y añadir a lista tabú
+            add_tabu = false;
+            int res = tabulist_insert( &htbu , &bestvar, bestrsl );
+            tabulist_print( &htbu );
+            restart_search = true;
+            if ( !res ) {
+                printf("\r\n -------- End simulation ------\r\n"); 
+                return 0;
+            }
+        }
 
 
     }
