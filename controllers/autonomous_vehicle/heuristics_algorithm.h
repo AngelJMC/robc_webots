@@ -11,6 +11,12 @@ enum{
   POINTS_NBH = 5,
 };
 
+enum{
+  SML_CONTINUE = 0,
+  SML_FINISH = 1,
+  SML_ERROR_RESTRICTION = 2,
+};
+
 struct point{
   double val;
   double devstd;
@@ -62,6 +68,7 @@ typedef struct {
   double offsetRad;
   double angle;
   int numfail;
+  int numfailAngle;
 
 } statusVar_t;
 
@@ -74,7 +81,7 @@ void heuristics_generate_neighbor_close( neighbor_t* nbh, decisionVar_t* var );
 
 void heuristics_init( decisionVar_t* var );
 
-bool heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle );
+int heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle );
 
 void heuristics_get_neighbor( decisionVar_t* var, neighbor_t* nbh );
 

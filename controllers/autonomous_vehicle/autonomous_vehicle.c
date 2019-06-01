@@ -106,7 +106,7 @@ static gps_t      gps;
 static accel_t    accel;
 
 
-void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar );
+bool run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar );
 
 
 void init_camera( camera_t* cam ){
@@ -229,25 +229,19 @@ double get_travelled_distance( statusVar_t* st  ){
 
 bool check_best_solution( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar, double bestdist ){
 
-    //double maxdist = fmax( dist, 0.0 );
-    //double mindist = fmin( dist, DBL_MAX );
-
     printf(" ---- Validate new solution ---- \n" );
     printf("        Val %d  -> dist: %f\n",  0, bestdist );
     for ( int i = 0; i < 2; ++i ){
-        run_simulation( nh, decvar , stvar );
+        bool res = run_simulation( nh, decvar , stvar );
         double const dist = get_travelled_distance( stvar );
-        //maxdist = fmax( dist, maxdist );
-        //mindist = fmin( dist, mindist );
         printf("        Val %d  -> dist: %f\n",  i +1, dist );
-        if ( (bestdist - dist) > 20.0 ) return false;
+        if ( (bestdist - dist) > 20.0  || !res ) return false;
     }
-    //printf("        ----> Diff %f \n",  fabs( maxdist - mindist) );
     return true;
     
 }
 
-void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar )
+bool run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar )
 {
         stvar->numfail = 0;
         init_speedParam(  &speedcrl, decvar->var.a.x, decvar->var.b.x, decvar->var.brakelimit.x  );
@@ -260,11 +254,16 @@ void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* s
         wb_supervisor_field_set_sf_vec3f( nh->viewPos.field, nh->viewPos.value );
         wb_supervisor_node_reset_physics( nh->carNode );
 
+        //wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
+        //for (int j = 0; j <50; ++j){
         wbu_driver_set_cruising_speed( 0.0 );
         wbu_driver_set_steering_angle( 0.0 );
-        wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
+        wbu_driver_step( );
+        //}
+        
 
         status_init( stvar );
+        robc_initLaneDetection( );
         /* Execute a new simulation */
         for (double t = 0.0; t <= 90.0; t += TIME_STEP / 1000.0) {
           
@@ -272,7 +271,8 @@ void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* s
             if ( camera.isEnabled ) {
                 const unsigned char *camera_image = wb_camera_get_image( camera.tag );
                 double const yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
-                double const angle = yellow_line_angle != UNKNOWN ? yellow_line_angle : stvar->angle;
+                //double const angle = yellow_line_angle != UNKNOWN ? yellow_line_angle : stvar->angle;
+                double const angle = yellow_line_angle;
                 set_speed( &speedcrl, angle );
                 set_steering_angle( &pidSteering, angle );
                 status_update( stvar, angle );
@@ -285,18 +285,17 @@ void run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* s
 
             
             bool const lastCycle = t >= 89.93;
-            bool res = heutistics_evaluate_restrictions( stvar, lastCycle );
-            if ( !res ) { 
+            int const stopSim = heutistics_evaluate_restrictions( stvar, lastCycle );
+            if ( stopSim ) {
+                return stopSim == SML_FINISH;
+            }
+                
                 //wbu_car_cleanup();
-                wbu_driver_set_cruising_speed( 0.0 );
-                wbu_driver_set_steering_angle( 0.0 );
-                wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
-
-                break; }
+                //wbu_driver_set_cruising_speed( 0.0 );
+                //wbu_driver_set_steering_angle( 0.0 );
+                //wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
         }
-
-
-
+    return SML_FINISH;
 }
 
 
@@ -378,13 +377,13 @@ int main(int argc, char **argv) {
         
         int iter_range = heuristics_get_range( &decvar);
         printf("Num simulation:  \n");
-        if ( iter_range < 128 )
+        
+        if ( iter_range < 32 )
             heuristics_generate_neighbor( nbh, &bestvar );
         else{
             heuristics_generate_neighbor_close( nbh, &bestvar );
             add_tabu = ( iter_range >= 2048 );
         }
-        
         
         
         for( iter = 0; iter < POINTS_NBH; ++iter ){
@@ -394,32 +393,36 @@ int main(int argc, char **argv) {
             heuristics_get_neighbor( &decvar, &nbh[iter] );
             heutistics_print_point( &decvar );
             
-            run_simulation( &nh, &decvar, &stvar );
-            dist = get_travelled_distance( &stvar );
+            int istabu = tabulist_isinlist( &htbu, &decvar );
+            if( !istabu ){
+                bool const simres = run_simulation( &nh, &decvar, &stvar );
+                dist = get_travelled_distance( &stvar );
 
-            printf("Iter: %d, distance: %f, best distance: %f\r\n", iter, dist, bestrsl ); 
-            
-
-            
-            if ( dist > bestrsl && dist > 250.0 ){
-                bool res = check_best_solution(  &nh, &decvar , &stvar, dist );
-                if( res ){
-                    bestiter = iter;
-                    bestrsl = dist;
-                    baditers = 0;
-                    break;
+                printf("Iter: %d, distance: %f, best distance: %f\r\n", iter, dist, bestrsl ); 
+                
+                
+                if ( dist > bestrsl  &&  simres ){
+                    bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
+                    if( res ){
+                        bestiter = iter;
+                        bestrsl = dist;
+                        baditers = 0;
+                        break;
+                    }
                 }
-            }
-            else if( dist > 100.0 ){
-                ++baditers;
-            }
+                else if( simres ){
+                    ++baditers;
+                }
 
-            if( baditers >= 14 ){
-                heuristics_update_range( &decvar );
-                baditers = 0;
-            }
+                if( baditers >= 6 ){
+                    heuristics_update_range( &decvar );
+                    baditers = 0;
+                }
 
-            printf("num Iter: %d, bad iter: %d\r\n", iter_all, baditers); 
+                printf("num Iter: %d, bad iter: %d\r\n", iter_all, baditers); 
+            }else{
+                printf("This neighbor is tabu!!\r\n"); 
+            }
 
         }
 
@@ -449,12 +452,9 @@ int main(int argc, char **argv) {
 
     }
     
-    //wb_supervisor_simulation_reset(); 
-
-
-
+    wb_supervisor_simulation_reset(); 
     wbu_driver_cleanup(); 
-    //wbu_car_cleanup();
+    wbu_car_cleanup();
 
     return 0;  // ignored
 }

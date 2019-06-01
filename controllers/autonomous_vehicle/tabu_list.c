@@ -6,7 +6,7 @@
 #include "math.h"
 
 enum{
-    THRESHOLD_DIV = 10,
+    THRESHOLD_DIV = 20,
 };
 
 

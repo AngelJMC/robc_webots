@@ -8,23 +8,40 @@
 #define UNKNOWN 99999.99
 
 
+static bool first_call = true;
+static double old_value[FILTER_SIZE];
+static int numFailImage = 0;
+static double lastAngle = 0.0;
+
 static double process_camera_image(const unsigned char *image, const struct camera_param* camParam);
 static int color_diff(const unsigned char a[3], const unsigned char b[3]);
 static double filter_angle(double new_value);
 
 
+
+void robc_initLaneDetection( void ){
+  first_call = true;
+}
+
 double robc_getAngleFromCamera( const unsigned char *image, const struct camera_param* camParam ){
 
-  const double angle = process_camera_image( image, camParam );
-  return filter_angle( angle );
+  double angle = process_camera_image( image, camParam );
+  if( angle == UNKNOWN ){
+    ++numFailImage;
+    angle = lastAngle;
+  }
+  else
+    numFailImage = 0;
+
+  lastAngle = angle;
+  return filter_angle( numFailImage > 100 ? UNKNOWN : angle );
 }
 
 
 // filter angle of the yellow line (simple average)
 static double filter_angle(double new_value) {
 
-  static bool first_call = true;
-  static double old_value[FILTER_SIZE];
+
   int i;
 
   if (first_call || new_value == UNKNOWN) {  // reset all the old values to 0.0

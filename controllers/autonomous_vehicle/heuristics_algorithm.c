@@ -194,31 +194,32 @@ enum{
 
 };
 
-bool heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle ){
+
+
+int heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle ){
   if( verbose ){
     printf( " ACCEL    -> X: %f, Y: %f, Z: %f\r\n", st->accel.x, st->accel.y, st->accel.z);
     printf( " DISTANCE -> m: %f\r\n", st->dist);
     printf( " SPEED    -> Speed: %f\r\n", st->speed );
     printf( " ANGLE    -> angle: %f\r\n", st->angle );
   }
-  int err = 0;
-  if( st->accel.z < 7.0 ){
+
+  if( st->accel.z < 7.0 ) 
     ++st->numfail;
-    err |= st->numfail > 1;
-  }
-  else{
+  else
     if( st->numfail > 0 ){ --st->numfail; }
-  }
-
-  //err |= st->angle == UNKNOWN;
   
-  if ( finishCycle || err ) { 
-    printf( " Finish simulation by %s", err ? "fail restrictions." : "end cycle." );
-    printf( " Err code: %d\r\n", err?  err : 0);
-    return false;
+  if ( st->angle == UNKNOWN || st->numfail > 1 ){
+    printf( " Finish simulation by restrictions: %s\n", st->angle == UNKNOWN? "Fail angle detection" : "Fail acceleration" );
+    return SML_ERROR_RESTRICTION;
   }
 
-  return true;
+  if ( finishCycle ) { 
+    printf( " Finish simulation by end cycle.\n" );
+    return SML_FINISH;
+  }
+
+  return SML_CONTINUE;
 }
 
 void heutistics_print_point( decisionVar_t* var ){
