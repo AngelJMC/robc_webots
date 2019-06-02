@@ -98,7 +98,7 @@ void heuristics_init( decisionVar_t* var ){
 
 bool heuristics_is_finish_neighbor_search( decisionVar_t* var ){
 
-    return var->list[0].range >= MAX_ITER_IN_NBH;
+    return var->list[0].range > MAX_ITER_IN_NBH;
 }
 
 
@@ -106,7 +106,7 @@ void heuristics_intensify_neighbor_search( decisionVar_t* var ){
   for( int i = 0; i < NVAR; ++i){
     ++var->list[i].range;
   }
-  printf("  Updated range %d\r\n  ", var->list[0].range);
+  printf("\nLevel of search intensification: %d\r\n  ", var->list[0].range);
 }
 
 

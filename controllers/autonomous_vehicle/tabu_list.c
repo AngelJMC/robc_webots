@@ -32,30 +32,36 @@ bool _isinrange( decisionVar_t* refvar, decisionVar_t* dvar ){
         }
         printf(" OK\n");
     }
-    printf("\n");
+    printf("Neighbor is in taboo\n");
     return true;
 }
 
 bool tabulist_isinlist( tabuhdlr_t* htbu, decisionVar_t* dvar ){
 
-    bool inrange = true;
+    bool inrange = false;
     if( htbu->front == -1){
-        printf("\nTabu list is Empty!!!\n");
+        printf("\nTaboo list is Empty!!!\n");
         inrange = false;
     }
     else{
         int i = htbu->front;
         printf("\nTabu list elements are : \n");
         if( htbu->front <= htbu->rear ){
-	        while(i <= htbu->rear)
-                inrange &= _isinrange( &htbu->list[i++].dvar , dvar );
+	        while(i <= htbu->rear){
+                inrange = _isinrange( &htbu->list[i++].dvar , dvar );
+                if( inrange ) return true;
+            }
         }
         else{
-	        while(i <= TABU_LIST_SIZE - 1)
+	        while(i <= TABU_LIST_SIZE - 1){
 	            inrange &= _isinrange( &htbu->list[i++].dvar , dvar );
+                if( inrange ) return true;
+            }
 	        i = 0;
-	        while(i <= htbu->rear)
+	        while(i <= htbu->rear){
 	            inrange &= _isinrange( &htbu->list[i++].dvar , dvar );
+                if( inrange ) return true;
+            }
         }
     }
     return inrange;
@@ -66,7 +72,7 @@ bool tabulist_insert( tabuhdlr_t* htbu , decisionVar_t* dvar, double dist )
 {
     if( ( htbu->front == 0 && htbu->rear == TABU_LIST_SIZE - 1 ) 
             || ( htbu->front == htbu->rear+1 ) ){
-        printf("\nTabu list is Full! Insertion not possible!!!\n");
+        printf("\nTaboo list is Full! Insertion not possible!!!\n");
         return false;
     }
     
@@ -87,7 +93,7 @@ bool tabulist_insert( tabuhdlr_t* htbu , decisionVar_t* dvar, double dist )
 void tabulist_remove( tabuhdlr_t* htbu )
 {
     if( htbu->front == -1 && htbu->rear == -1 )
-        printf("\nTabu list is Empty! Deletion is not possible!!!\n");
+        printf("\nTaboo list is Empty! Deletion is not possible!!!\n");
     else{
         printf("\nDeleted element : %f\n",htbu->list[ htbu->front++ ].dist );
         if( htbu->front == TABU_LIST_SIZE )
@@ -100,10 +106,10 @@ void tabulist_remove( tabuhdlr_t* htbu )
 void tabulist_print( tabuhdlr_t* htbu ){
 
     if( htbu->front == -1)
-        printf("\nTabu list is Empty!!!\n");
+        printf("\nTaboo list is Empty!!!\n");
     else{
         int i = htbu->front;
-        printf("\nTabu list elements are : \n");
+        printf("\nTaboo list elements are : \n");
         if( htbu->front <= htbu->rear ){
 	        while(i <= htbu->rear)
                 _print_tabu( &htbu->list[i++] );

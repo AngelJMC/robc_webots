@@ -11,7 +11,7 @@
 
 enum{
     TABU_LIST_SIZE = 15,
-    TABU_THRESHOLD = 50,
+    TABU_THRESHOLD = 25,
 };
 
 
