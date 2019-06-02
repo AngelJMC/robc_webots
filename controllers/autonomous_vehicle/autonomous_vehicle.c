@@ -209,11 +209,6 @@ void status_update( statusVar_t* st , double angle){
                     + wbu_car_get_wheel_encoder( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
     st->dist = fabs( rad - st->offsetRad ) * wheelradious;
     st->angle = angle;
-#if 0
-    st->speed = ( wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_RIGHT ) 
-                    + wbu_car_get_wheel_speed( WBU_CAR_WHEEL_REAR_LEFT ) ) / 2;
-#endif
-
     st->speed = wbu_driver_get_current_speed();
 
     const double* a = wb_accelerometer_get_values( accel.tag );
@@ -268,9 +263,7 @@ bool run_simulation( decisionVar_t* decvar , statusVar_t* stvar )
             wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
             if ( camera.isEnabled ) {
                 const unsigned char *camera_image = wb_camera_get_image( camera.tag );
-                double const yellow_line_angle = robc_getAngleFromCamera( camera_image, &camera.param );
-                //double const angle = yellow_line_angle != UNKNOWN ? yellow_line_angle : stvar->angle;
-                double const angle = yellow_line_angle;
+                double const angle = robc_getAngleFromCamera( camera_image, &camera.param );
                 set_speed( &speedcrl, angle );
                 set_steering_angle( &pidSteering, angle );
                 status_update( stvar, angle );
@@ -343,7 +336,6 @@ int main(int argc, char **argv) {
     robc_control_init();        // start engine
     tabulist_init( &htbu );
     
-    
     static int      num_iter = 0;
     static bool     restart_search = true;
     static double   bestrsl = 0;
@@ -361,7 +353,7 @@ int main(int argc, char **argv) {
         }
         
         heuristics_generate_neighbor( nbh, &bestvar, bestrsl );
-        //Se recorrie el vecindario en busca de la mejor solucion
+        /*It is iterated over all members of the neighborhood until the best solution is found. */
         for( int nbIter = 0; nbIter < POINTS_NBH; ++nbIter ){
             
             statusVar_t stvar;
@@ -386,7 +378,7 @@ int main(int argc, char **argv) {
             }   
         }
 
-        /* Comprobamos si en el vecinadario se ha dado una iteracion con mejor resultado*/
+        /* Check if in the neighborhood there has been an iteration with better result*/
         if( bestiter != -1 ){
             printf("\nDiscovered best solution in neighbor %d -> distance: %f\r\n", bestiter, bestrsl); 
             heuristics_get_neighbor( &decvar, &nbh[bestiter] );
@@ -398,13 +390,13 @@ int main(int argc, char **argv) {
             
         }
 
-        //Sin en el vecindatio no se ha encontrado una mejor solución, se intensifica la busqueda sobre la última mejor solucion
+        /*If a better solution has not been found in the neighborhood, the search is intensified on the last better solution.*/
         if( bestiter == -1  && bestrsl != 0.0 ){
             heuristics_intensify_neighbor_search( &decvar );
         }
 
         if( heuristics_is_finish_neighbor_search( &decvar ) ){
-            //Reset algoritmo y añadir a lista tabú
+            /*Reset algorithm and add to taboo list*/
             int res = tabulist_insert( &htbu , &bestvar, bestrsl );
             tabulist_print( &htbu );
             restart_search = true;
