@@ -34,7 +34,7 @@ double robc_getAngleFromCamera( const unsigned char *image, const struct camera_
     numFailImage = 0;
 
   lastAngle = angle;
-  return filter_angle( numFailImage > 100 ? UNKNOWN : angle );
+  return filter_angle( numFailImage > 200 ? UNKNOWN : angle );
 }
 
 

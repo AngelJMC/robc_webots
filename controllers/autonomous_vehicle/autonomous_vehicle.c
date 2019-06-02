@@ -229,13 +229,13 @@ bool check_best_solution( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar
     enum{
         NUM_ITER_TO_VALIDATE = 2,
     };
-    printf(" ---- Validate new solution ---- \n" );
-    printf("        Val %d  -> dist: %f\n",  0, bestdist );
+    printf("\n  ---- Validate new solution ---- \n" );
+    printf("        Check %d  -> distante: %f\n",  0, bestdist );
     for ( int i = 0; i < NUM_ITER_TO_VALIDATE; ++i ){
         car_restart_position( nh );
         bool const res = run_simulation( decvar , stvar );
         double const dist = heuristics_get_objetive( stvar );
-        printf("        Val %d  -> dist: %f\n",  i +1, dist );
+        printf("        Check %d  -> distante: %f\n",  i +1, dist );
         if ( (bestdist - dist) > 20.0  || !res ) return false;
     }
     return true;
@@ -254,7 +254,7 @@ void car_restart_position( struct nodeHdlr* nh ){
 
 bool run_simulation( decisionVar_t* decvar , statusVar_t* stvar )
 {
-        printf("Setting param new cycle... ");
+        printf("  Setting param new cycle... ");
         stvar->numfail = 0;
         init_speedParam(  &speedcrl, decvar->var.a.x, decvar->var.b.x, decvar->var.brakelimit.x  );
         init_steeringParam(  &pidSteering, decvar->var.kp.x, decvar->var.ki.x, 0.0 );
@@ -343,13 +343,9 @@ int main(int argc, char **argv) {
     robc_control_init();        // start engine
     tabulist_init( &htbu );
     
-    //heuristics_init( &decvar );
-    //memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
     
-    static int      baditers = 0;
-    static int      iter_all = 0;
+    static int      num_iter = 0;
     static bool     restart_search = true;
-    //static int      iter = 0;
     static double   bestrsl = 0;
 
     /* Run simulation */
@@ -359,53 +355,40 @@ int main(int argc, char **argv) {
 
         if( restart_search ){
             restart_search = false;
-            baditers = 0;
             bestrsl = 0;
             heuristics_init( &decvar );
             memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
         }
         
-
         heuristics_generate_neighbor( nbh, &bestvar, bestrsl );
-
         //Se recorrie el vecindario en busca de la mejor solucion
         for( int nbIter = 0; nbIter < POINTS_NBH; ++nbIter ){
             
             statusVar_t stvar;
-            ++iter_all;
-            
+            ++num_iter;
+            printf("\nGet neighbor %d from iteration %d\r\n", nbIter , num_iter );
             heuristics_get_neighbor( &decvar, &nbh[nbIter] );
             heutistics_print_point( &decvar );  
             car_restart_position( &nh );
             bool const simres = run_simulation( &decvar, &stvar );
             double const dist = heuristics_get_objetive( &stvar );
 
-            printf("Global Iter: %d, Neighbor iter: %d, last distance: %f, distance: %f, bad iters: %d\r\n", 
-                iter_all, nbIter + 1, dist, bestrsl, baditers ); 
+            printf("  Results from iter %d -> distance: %f, best distance: %f \r\n", 
+                num_iter, dist, bestrsl ); 
                 
             if ( dist > bestrsl  &&  simres ){
                 bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
                 if( res ){
                     bestiter = nbIter;
                     bestrsl = dist;
-                    baditers = 0;
                     break;
                 }
-            }
-                
-            if( bestrsl != 0.0 ){
-                ++baditers;
-                //Con iteraciones sin mejora se intensifica la busqueda en el rango de la mejor solucion
-                if( baditers >= 9 ){
-                    heuristics_update_range( &decvar );
-                    baditers = 0;
-                }
-            }    
-
+            }   
         }
 
+        /* Comprobamos si en el vecinadario se ha dado una iteracion con mejor resultado*/
         if( bestiter != -1 ){
-            printf("Best: [%d], distance: %f\r\n", bestiter, bestrsl); 
+            printf("\nDiscovered best solution in neighbor %d -> distance: %f\r\n", bestiter, bestrsl); 
             heuristics_get_neighbor( &decvar, &nbh[bestiter] );
             int istabu = tabulist_isinlist( &htbu, &decvar );
             if( !istabu )
@@ -415,23 +398,25 @@ int main(int argc, char **argv) {
             
         }
 
-        int iter_range = heuristics_get_range( &decvar);
-        printf("Iteration range: %d\r\n", iter_range);
-        bool add_tabu = ( iter_range >= 2048 ); 
-        if( add_tabu ){
+        //Sin en el vecindatio no se ha encontrado una mejor solución, se intensifica la busqueda sobre la última mejor solucion
+        if( bestiter == -1  && bestrsl != 0.0 ){
+            heuristics_intensify_neighbor_search( &decvar );
+        }
+
+        if( heuristics_is_finish_neighbor_search( &decvar ) ){
             //Reset algoritmo y añadir a lista tabú
             int res = tabulist_insert( &htbu , &bestvar, bestrsl );
             tabulist_print( &htbu );
             restart_search = true;
+            
             if ( !res ) {
                 printf("\r\n -------- End simulation ------\r\n"); 
                 return 0;
             }
         }
-
-
     }
     
+    wb_supervisor_simulation_set_mode( WB_SUPERVISOR_SIMULATION_MODE_PAUSE );
     wb_supervisor_simulation_reset(); 
     wbu_driver_cleanup(); 
     wbu_car_cleanup();

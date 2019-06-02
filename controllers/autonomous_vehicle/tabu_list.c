@@ -5,10 +5,6 @@
 #include "tabu_list.h"
 #include "math.h"
 
-enum{
-    THRESHOLD_DIV = 50,
-};
-
 
 void _print_tabu( struct tabu* tbu );
 
@@ -27,7 +23,7 @@ bool _isinrange( decisionVar_t* refvar, decisionVar_t* dvar ){
     for ( int i = 0; i < NVAR; ++i ){
         ref = refvar->list[i].x;
         val = dvar->list[i].x;
-        incr = ref * THRESHOLD_DIV / 100.0;
+        incr = ref * TABU_THRESHOLD / 100.0;
         printf(" [%f >= %f >= %f] ? ", fabs( ref + incr ), val, fabs( ref - incr ) );
         if ( fabs( ref + incr ) < fabs( val )  
                 ||  fabs( ref - incr ) > fabs( val ) ){
@@ -44,18 +40,18 @@ bool tabulist_isinlist( tabuhdlr_t* htbu, decisionVar_t* dvar ){
 
     bool inrange = true;
     if( htbu->front == -1){
-        printf("\nCircular Queue is Empty!!!\n");
+        printf("\nTabu list is Empty!!!\n");
         inrange = false;
     }
     else{
         int i = htbu->front;
-        printf("\nCircular Queue Elements are : \n");
+        printf("\nTabu list elements are : \n");
         if( htbu->front <= htbu->rear ){
 	        while(i <= htbu->rear)
                 inrange &= _isinrange( &htbu->list[i++].dvar , dvar );
         }
         else{
-	        while(i <= SIZE - 1)
+	        while(i <= TABU_LIST_SIZE - 1)
 	            inrange &= _isinrange( &htbu->list[i++].dvar , dvar );
 	        i = 0;
 	        while(i <= htbu->rear)
@@ -68,13 +64,13 @@ bool tabulist_isinlist( tabuhdlr_t* htbu, decisionVar_t* dvar ){
 
 bool tabulist_insert( tabuhdlr_t* htbu , decisionVar_t* dvar, double dist )
 {
-    if( ( htbu->front == 0 && htbu->rear == SIZE - 1 ) 
+    if( ( htbu->front == 0 && htbu->rear == TABU_LIST_SIZE - 1 ) 
             || ( htbu->front == htbu->rear+1 ) ){
-        printf("\nCircular Queue is Full! Insertion not possible!!!\n");
+        printf("\nTabu list is Full! Insertion not possible!!!\n");
         return false;
     }
     
-    if( htbu->rear == SIZE-1 && htbu->front != 0 )
+    if( htbu->rear == TABU_LIST_SIZE-1 && htbu->front != 0 )
 	    htbu->rear = -1;
     struct tabu const t = {
             .dvar = *dvar,
@@ -91,10 +87,10 @@ bool tabulist_insert( tabuhdlr_t* htbu , decisionVar_t* dvar, double dist )
 void tabulist_remove( tabuhdlr_t* htbu )
 {
     if( htbu->front == -1 && htbu->rear == -1 )
-        printf("\nCircular Queue is Empty! Deletion is not possible!!!\n");
+        printf("\nTabu list is Empty! Deletion is not possible!!!\n");
     else{
         printf("\nDeleted element : %f\n",htbu->list[ htbu->front++ ].dist );
-        if( htbu->front == SIZE )
+        if( htbu->front == TABU_LIST_SIZE )
 	        htbu->front = 0;
         if( htbu->front-1 == htbu->rear)
 	        htbu->front = htbu->rear = -1;
@@ -104,16 +100,16 @@ void tabulist_remove( tabuhdlr_t* htbu )
 void tabulist_print( tabuhdlr_t* htbu ){
 
     if( htbu->front == -1)
-        printf("\nCircular Queue is Empty!!!\n");
+        printf("\nTabu list is Empty!!!\n");
     else{
         int i = htbu->front;
-        printf("\nCircular Queue Elements are : \n");
+        printf("\nTabu list elements are : \n");
         if( htbu->front <= htbu->rear ){
 	        while(i <= htbu->rear)
                 _print_tabu( &htbu->list[i++] );
         }
         else{
-	        while(i <= SIZE - 1)
+	        while(i <= TABU_LIST_SIZE - 1)
 	            _print_tabu( &htbu->list[i++] );
 	        i = 0;
 	        while(i <= htbu->rear)
@@ -125,12 +121,12 @@ void tabulist_print( tabuhdlr_t* htbu ){
 void _print_tabu( struct tabu* tbu ){
     
     decisionVar_t* dvar = &tbu->dvar;
-    printf("Distance: %f --- Param a: %f, b: %f, Bp: %f, Ki: %f, Kp: %f\n",
+    printf("Distance: %f --- Param Kp: %f, Ki: %f, a: %f, b: %f, Bp: %f\n",
         tbu->dist,
+        dvar->var.kp.x,
+        dvar->var.ki.x,
         dvar->var.a.x,
         dvar->var.b.x,
-        dvar->var.brakelimit.x,
-        dvar->var.ki.x,
-        dvar->var.kp.x );
+        dvar->var.brakelimit.x );
 
 }

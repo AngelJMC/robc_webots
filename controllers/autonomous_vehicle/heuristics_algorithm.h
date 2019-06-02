@@ -7,8 +7,13 @@
 #include <stdint.h>
 
 enum{
-  NVAR = 5,
-  POINTS_NBH = 5,
+    NVAR = 5,
+};
+
+enum{
+  POINTS_NBH = 20,
+  NORMAL_ITER_IN_NBH = 9,
+  MAX_ITER_IN_NBH = 11,
 };
 
 enum{
@@ -72,7 +77,7 @@ typedef struct {
 
 } statusVar_t;
 
-void heuristics_loadDefault( decisionVar_t* var );
+
 
 int heuristics_loadParam( decisionVar_t* var );
 
@@ -88,8 +93,11 @@ void heuristics_get_neighbor( decisionVar_t* var, neighbor_t* nbh );
 
 void heutistics_print_point( decisionVar_t* var );
 
-void heuristics_update_range( decisionVar_t* var );
+bool heuristics_is_finish_neighbor_search( decisionVar_t* var );
+
+void heuristics_intensify_neighbor_search( decisionVar_t* var );
 
 int heuristics_get_range( decisionVar_t* var );
 
+void heuristics_print_neighborhood( neighbor_t* nbh );
 #endif /*HEURISTICS_ALGORITHM_H*/

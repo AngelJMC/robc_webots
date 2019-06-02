@@ -10,7 +10,8 @@
 
 
 enum{
-    SIZE = 15,
+    TABU_LIST_SIZE = 15,
+    TABU_THRESHOLD = 50,
 };
 
 
@@ -21,7 +22,7 @@ struct tabu{
 
 
 typedef struct{
-    struct tabu list[SIZE];
+    struct tabu list[TABU_LIST_SIZE];
     int front;
     int rear;
     int itemCount;
