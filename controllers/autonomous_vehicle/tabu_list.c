@@ -6,7 +6,7 @@
 #include "math.h"
 
 enum{
-    THRESHOLD_DIV = 20,
+    THRESHOLD_DIV = 50,
 };
 
 
@@ -27,7 +27,7 @@ bool _isinrange( decisionVar_t* refvar, decisionVar_t* dvar ){
     for ( int i = 0; i < NVAR; ++i ){
         ref = refvar->list[i].x;
         val = dvar->list[i].x;
-        incr = ref / THRESHOLD_DIV ;
+        incr = ref * THRESHOLD_DIV / 100.0;
         printf(" [%f >= %f >= %f] ? ", fabs( ref + incr ), val, fabs( ref - incr ) );
         if ( fabs( ref + incr ) < fabs( val )  
                 ||  fabs( ref - incr ) > fabs( val ) ){

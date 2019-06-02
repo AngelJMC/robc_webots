@@ -106,8 +106,8 @@ static gps_t      gps;
 static accel_t    accel;
 
 
-bool run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar );
-
+bool run_simulation( decisionVar_t* decvar , statusVar_t* stvar );
+void car_restart_position( struct nodeHdlr* nh );
 
 void init_camera( camera_t* cam ){
     assert( NULL != cam );
@@ -222,18 +222,19 @@ void status_update( statusVar_t* st , double angle){
     st->accel.x = a[2]; 
 }
 
-double get_travelled_distance( statusVar_t* st  ){
-    return st->dist;
-}
 
 
 bool check_best_solution( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar, double bestdist ){
 
+    enum{
+        NUM_ITER_TO_VALIDATE = 2,
+    };
     printf(" ---- Validate new solution ---- \n" );
     printf("        Val %d  -> dist: %f\n",  0, bestdist );
-    for ( int i = 0; i < 2; ++i ){
-        bool res = run_simulation( nh, decvar , stvar );
-        double const dist = get_travelled_distance( stvar );
+    for ( int i = 0; i < NUM_ITER_TO_VALIDATE; ++i ){
+        car_restart_position( nh );
+        bool const res = run_simulation( decvar , stvar );
+        double const dist = heuristics_get_objetive( stvar );
         printf("        Val %d  -> dist: %f\n",  i +1, dist );
         if ( (bestdist - dist) > 20.0  || !res ) return false;
     }
@@ -241,27 +242,24 @@ bool check_best_solution( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar
     
 }
 
-bool run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* stvar )
+void car_restart_position( struct nodeHdlr* nh ){
+
+    /*Return to initial position*/       
+    wb_supervisor_field_set_sf_vec3f( nh->carTrans.field, nh->carTrans.value );
+    wb_supervisor_field_set_sf_rotation( nh->carRot.field, nh->carRot.value );
+    wb_supervisor_field_set_sf_vec3f( nh->viewPos.field, nh->viewPos.value );
+    wb_supervisor_node_reset_physics( nh->carNode );
+    wbu_car_init();
+}
+
+bool run_simulation( decisionVar_t* decvar , statusVar_t* stvar )
 {
+        printf("Setting param new cycle... ");
         stvar->numfail = 0;
         init_speedParam(  &speedcrl, decvar->var.a.x, decvar->var.b.x, decvar->var.brakelimit.x  );
         init_steeringParam(  &pidSteering, decvar->var.kp.x, decvar->var.ki.x, 0.0 );
-        //wbu_car_init();
-
-        /*Return to initial position*/       
-        wb_supervisor_field_set_sf_vec3f( nh->carTrans.field, nh->carTrans.value );
-        wb_supervisor_field_set_sf_rotation( nh->carRot.field, nh->carRot.value );
-        wb_supervisor_field_set_sf_vec3f( nh->viewPos.field, nh->viewPos.value );
-        wb_supervisor_node_reset_physics( nh->carNode );
-
-        //wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
-        //for (int j = 0; j <50; ++j){
-        wbu_driver_set_cruising_speed( 0.0 );
-        wbu_driver_set_steering_angle( 0.0 );
-        wbu_driver_step( );
-        //}
         
-
+        printf("start simulation... \n");
         status_init( stvar );
         robc_initLaneDetection( );
         /* Execute a new simulation */
@@ -290,44 +288,24 @@ bool run_simulation( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar_t* s
                 return stopSim == SML_FINISH;
             }
                 
-                //wbu_car_cleanup();
-                //wbu_driver_set_cruising_speed( 0.0 );
-                //wbu_driver_set_steering_angle( 0.0 );
-                //wbu_driver_step( );   // updates sensors only every TIME_STEP milliseconds
         }
+        printf("stop simulation error \n");
     return SML_FINISH;
 }
 
 
+void car_devices_init( struct nodeHdlr* nh )
+{
+    nh->carNode = wb_supervisor_node_get_self();
+    nh->carTrans.field = wb_supervisor_node_get_field( nh->carNode, "translation" );
+    nh->carTrans.value = wb_supervisor_field_get_sf_vec3f( nh->carTrans.field );
+    nh->carRot.field = wb_supervisor_node_get_field( nh->carNode, "rotation" );
+    nh->carRot.value = wb_supervisor_field_get_sf_rotation( nh->carRot.field );
 
+    nh->viewNode = wb_supervisor_node_get_from_def( "viewp" );
+    nh->viewPos.field = wb_supervisor_node_get_field( nh->viewNode, "position" );
+    nh->viewPos.value = wb_supervisor_field_get_sf_vec3f( nh->viewPos.field );
 
-int main(int argc, char **argv) {
-    
-    decisionVar_t decvar;
-    decisionVar_t bestvar;
-    neighbor_t nbh[NVAR];
-    struct nodeHdlr nh;
-    static tabuhdlr_t htbu;
-
-    wb_robot_init();
-    tabulist_init( &htbu );
-    
-    
-    nh.carNode = wb_supervisor_node_get_self();
-
-    nh.carTrans.field = wb_supervisor_node_get_field( nh.carNode, "translation");
-    nh.carTrans.value = wb_supervisor_field_get_sf_vec3f( nh.carTrans.field );
-
-    nh.carRot.field = wb_supervisor_node_get_field(nh.carNode, "rotation");
-    nh.carRot.value = wb_supervisor_field_get_sf_rotation( nh.carRot.field );
-
-    nh.viewNode = wb_supervisor_node_get_from_def("viewp");
-
-    nh.viewPos.field = wb_supervisor_node_get_field( nh.viewNode, "position");
-    nh.viewPos.value = wb_supervisor_field_get_sf_vec3f( nh.viewPos.field );
-
-
-    // check devices
     for (int j = 0; j < wb_robot_get_number_of_devices(); ++j) {
         WbDeviceTag device = wb_robot_get_device_by_index(j);
         const char *name = wb_device_get_name( device );
@@ -348,23 +326,35 @@ int main(int argc, char **argv) {
             init_accelerometer( &accel ); 
         }
     }
+
+}
+
+
+int main(int argc, char **argv) {
     
-    heuristics_init( &decvar );
-    memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+    decisionVar_t decvar;
+    decisionVar_t bestvar;
+    neighbor_t nbh[NVAR];
+    struct nodeHdlr nh;
+    static tabuhdlr_t htbu;
+
+    wb_robot_init();
+    car_devices_init( &nh );    // check devices
+    robc_control_init();        // start engine
+    tabulist_init( &htbu );
     
-    static int iter = 0;
-    static double bestrsl = 0;
-    static double dist = 0;
-    // start engine
-    robc_startEngine( );
+    //heuristics_init( &decvar );
+    //memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+    
+    static int      baditers = 0;
+    static int      iter_all = 0;
+    static bool     restart_search = true;
+    //static int      iter = 0;
+    static double   bestrsl = 0;
+
     /* Run simulation */
-    int baditers = 0;
-    int iter_all = 0;
-    bool add_tabu = false;
-    bool restart_search = false;
     while(true){
         /* Load the value of decision variables from heuristic algorithm */
-        //int nsim = heuristics_loadParam( &decvar );
         int bestiter = -1;
 
         if( restart_search ){
@@ -375,54 +365,42 @@ int main(int argc, char **argv) {
             memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
         }
         
-        int iter_range = heuristics_get_range( &decvar);
-        printf("Num simulation:  \n");
-        
-        if ( iter_range < 32 )
-            heuristics_generate_neighbor( nbh, &bestvar );
-        else{
-            heuristics_generate_neighbor_close( nbh, &bestvar );
-            add_tabu = ( iter_range >= 2048 );
-        }
-        
-        
-        for( iter = 0; iter < POINTS_NBH; ++iter ){
+
+        heuristics_generate_neighbor( nbh, &bestvar, bestrsl );
+
+        //Se recorrie el vecindario en busca de la mejor solucion
+        for( int nbIter = 0; nbIter < POINTS_NBH; ++nbIter ){
             
             statusVar_t stvar;
             ++iter_all;
-            heuristics_get_neighbor( &decvar, &nbh[iter] );
-            heutistics_print_point( &decvar );
             
-            int istabu = tabulist_isinlist( &htbu, &decvar );
-            if( !istabu ){
-                bool const simres = run_simulation( &nh, &decvar, &stvar );
-                dist = get_travelled_distance( &stvar );
+            heuristics_get_neighbor( &decvar, &nbh[nbIter] );
+            heutistics_print_point( &decvar );  
+            car_restart_position( &nh );
+            bool const simres = run_simulation( &decvar, &stvar );
+            double const dist = heuristics_get_objetive( &stvar );
 
-                printf("Iter: %d, distance: %f, best distance: %f\r\n", iter, dist, bestrsl ); 
+            printf("Global Iter: %d, Neighbor iter: %d, last distance: %f, distance: %f, bad iters: %d\r\n", 
+                iter_all, nbIter + 1, dist, bestrsl, baditers ); 
                 
+            if ( dist > bestrsl  &&  simres ){
+                bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
+                if( res ){
+                    bestiter = nbIter;
+                    bestrsl = dist;
+                    baditers = 0;
+                    break;
+                }
+            }
                 
-                if ( dist > bestrsl  &&  simres ){
-                    bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
-                    if( res ){
-                        bestiter = iter;
-                        bestrsl = dist;
-                        baditers = 0;
-                        break;
-                    }
-                }
-                else if( simres ){
-                    ++baditers;
-                }
-
-                if( baditers >= 6 ){
+            if( bestrsl != 0.0 ){
+                ++baditers;
+                //Con iteraciones sin mejora se intensifica la busqueda en el rango de la mejor solucion
+                if( baditers >= 9 ){
                     heuristics_update_range( &decvar );
                     baditers = 0;
                 }
-
-                printf("num Iter: %d, bad iter: %d\r\n", iter_all, baditers); 
-            }else{
-                printf("This neighbor is tabu!!\r\n"); 
-            }
+            }    
 
         }
 
@@ -437,9 +415,11 @@ int main(int argc, char **argv) {
             
         }
 
+        int iter_range = heuristics_get_range( &decvar);
+        printf("Iteration range: %d\r\n", iter_range);
+        bool add_tabu = ( iter_range >= 2048 ); 
         if( add_tabu ){
             //Reset algoritmo y añadir a lista tabú
-            add_tabu = false;
             int res = tabulist_insert( &htbu , &bestvar, bestrsl );
             tabulist_print( &htbu );
             restart_search = true;

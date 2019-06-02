@@ -30,6 +30,10 @@ static struct rnd rnd;
 static double const best[]={3.478409, 1.686536, 39.425038, 0.160485, 40.088450};
 //static struct neighborPoint neighborhood[NVAR];
 
+void _generate_neighbor_normal( neighbor_t* nb, decisionVar_t* var );
+void _generate_neighbor_random( neighbor_t* nb, decisionVar_t* var ); 
+void _generate_neighbor_close( neighbor_t* nb, decisionVar_t* var );
+
 void heuristics_loadDefault( decisionVar_t* var ){
 
 
@@ -49,6 +53,12 @@ int heuristics_loadParam( decisionVar_t* var ){
   return count;
 }
 
+double float_rand( double min, double max )
+{
+    double scale = rand() / (double) RAND_MAX; /* [0, 1.0] */
+    return min + scale * ( max - min );      /* [min, max] */
+}
+
 
 void heuristics_init( decisionVar_t* var ){
 
@@ -60,31 +70,31 @@ void heuristics_init( decisionVar_t* var ){
   rnd.rid = gsl_rng_alloc ( rnd.T  );
   gsl_rng_set(rnd.r,time(NULL) );
   gsl_rng_set(rnd.rid,time(NULL) );
-
+  srand( time(0) );
 
   data->kp.xl = 0;
   data->kp.xu = 4.0;
-  data->kp.x = ( data->kp.xl + data->kp.xu ) / 2;
+  data->kp.x = float_rand( data->kp.xl, data->kp.xu );
 
   
   data->ki.xl = 1.0;
   data->ki.xu = 3.0;
-  data->ki.x  = ( data->ki.xl + data->ki.xu ) / 2;
+  data->ki.x = float_rand( data->ki.xl, data->ki.xu );
 
   
   data->a.xl = 10.0;
   data->a.xu = 40.0;
-  data->a.x =  ( data->a.xl + data->a.xu ) / 2;
+  data->a.x = float_rand( data->a.xl, data->a.xu );
 
   
   data->b.xl = 0;
   data->b.xu = 2.0;
-  data->b.x  = ( data->b.xl + data->b.xu ) / 2;
+  data->b.x = float_rand( data->b.xl, data->b.xu );
 
   
   data->brakelimit.xl = 5.0;
   data->brakelimit.xu = 50.0;
-  data->brakelimit.x = ( data->brakelimit.xl + data->brakelimit.xu ) / 2;
+  data->brakelimit.x = float_rand( data->brakelimit.xl, data->brakelimit.xu );
 
   for( int i = 0; i < NVAR; ++i){
     var->list[i].range = 1;
@@ -103,7 +113,7 @@ void heuristics_update_range( decisionVar_t* var ){
   printf("  Updated range %d\r\n  ", var->list[0].range);
 }
 
-void heuristics_generate_neighbor( neighbor_t* nbh, decisionVar_t* var ){
+void heuristics_generate_neighbor( neighbor_t* nbh, decisionVar_t* var, double bestrsl ){
   
   assert( POINTS_NBH == NVAR );
   printf(" %s%s%s%s%s\r\n", 
@@ -112,72 +122,96 @@ void heuristics_generate_neighbor( neighbor_t* nbh, decisionVar_t* var ){
           "     [Sa]     ",
           "     [Sb]     ",
           "     [Bp]     ");
-
-	for( int n = 0; n < POINTS_NBH; ++n )
+    if ( bestrsl == 0 ){
+        for( int n = 0; n < POINTS_NBH; ++n )
+            _generate_neighbor_random( &nbh[n] , var);
+	return ;
+    }
+	
+    
+    for( int n = 0; n < POINTS_NBH; ++n )
 	{
-    neighbor_t* nb = &nbh[n];
-    unsigned long int const id1 = gsl_rng_get( rnd.rid ) % POINTS_NBH;
-    unsigned long int const id2 = gsl_rng_get( rnd.rid ) % POINTS_NBH;
-    for( int i = 0; i < NVAR; ++i ) 
-		{
-			double val = 0;
-      double const sigma = ( var->list[i].xu - var->list[i].xl ) / var->list[i].range;
-      nb->list[i].devstd = sigma;
+        int iter_range = heuristics_get_range( var);
+        neighbor_t* nb = &nbh[n];
+        
+        if ( iter_range < 512 )
+            _generate_neighbor_normal( nb, var );
+        else
+            _generate_neighbor_close( nb, var );
+    
+    }
+}
+
+void _generate_neighbor_normal( neighbor_t* nb, decisionVar_t* var ){
+  
+    assert( POINTS_NBH == NVAR );
+
+    int const id1 = (gsl_rng_get( rnd.rid ) + (int)var->list[0].x) % POINTS_NBH;
+    int const id2 = (gsl_rng_get( rnd.rid ) + (int)var->list[3].x) % POINTS_NBH;
+    for( int i = 0; i < NVAR; ++i ) {
+		double val = 0;
+        double const sigma = ( var->list[i].xu - var->list[i].xl ) / var->list[i].range;
+        nb->list[i].devstd = sigma;
       
-      if( id1 == i || id2 == i){
-        do{
-          val = gsl_ran_gaussian( rnd.r, sigma ) + var->list[i].x;
-        }while( val > var->list[i].xu || val < var->list[i].xl );
-        nb->list[i].val = val ;
-      }
-      else
-        nb->list[i].val = var->list[i].x;
+        if( id1 == i || id2 == i){
+            do{
+                val = gsl_ran_gaussian( rnd.r, sigma ) + var->list[i].x;
+            }while( val > var->list[i].xu || val < var->list[i].xl );
+            nb->list[i].val = val ;
+        }
+        else
+            nb->list[i].val = var->list[i].x;
       
-      //nb->list[i].val = best[i];
-      printf("  [%f]  ", nb->list[i].val); 
-		}
-    printf("\r\n"); 
+        printf("  [%f]  ", nb->list[i].val); 
 	}
+    printf("\r\n"); 
 }
 
 
-void heuristics_generate_neighbor_close( neighbor_t* nbh, decisionVar_t* var ){
+
+void _generate_neighbor_random( neighbor_t* nb, decisionVar_t* var ) {
+
+  assert( POINTS_NBH == NVAR );
+
+
+    for( int i = 0; i < NVAR; ++i ) {
+		double val = 0;
+        double const sigma = float_rand( var->list[i].xl, var->list[i].xu );
+        nb->list[i].devstd = sigma;
+        val = float_rand( var->list[i].xl, var->list[i].xu );
+        nb->list[i].val = val ;
+        printf("  [%f]  ", nb->list[i].val); 
+	}
+    printf("\r\n"); 
+}
+
+void _generate_neighbor_close( neighbor_t* nb, decisionVar_t* var ){
   
   assert( POINTS_NBH == NVAR );
-  printf(" %s%s%s%s%s\r\n", 
-          "     [Kp]     ",
-          "     [Ki]     ",
-          "     [Sa]     ",
-          "     [Sb]     ",
-          "     [Bp]     ");
 
-	for( int n = 0; n < POINTS_NBH; ++n )
-	{
-    neighbor_t* nb = &nbh[n];
-    unsigned long int const id1 = gsl_rng_get( rnd.rid ) % POINTS_NBH;
-    unsigned long int const id2 = gsl_rng_get( rnd.rid ) % POINTS_NBH;
-    for( int i = 0; i < NVAR; ++i ) 
-		{
-			double val = 0;
-      double const sigma = ( var->list[i].xu - var->list[i].xl ) / var->list[i].range;
-      nb->list[i].devstd = sigma;
+    int const id1 = (gsl_rng_get( rnd.rid ) + (int)var->list[0].x) % POINTS_NBH;
+    int const id2 = (gsl_rng_get( rnd.rid ) + (int)var->list[3].x) % POINTS_NBH;
+    for( int i = 0; i < NVAR; ++i ) {
+		double val = 0;
+        double const sigma = ( var->list[i].xu - var->list[i].xl ) / var->list[i].range;
+        nb->list[i].devstd = sigma;
       
-      if( id1 == i || id2 == i){
-        do{
-          unsigned long int r = gsl_rng_get( rnd.rid );
-          val = var->list[i].x + ( (r % 2 )? 1 : -1) * sigma ;
-        }while( val > var->list[i].xu || val < var->list[i].xl );
-        nb->list[i].val = val ;
-      }
-      else
-        nb->list[i].val = var->list[i].x;
+        if( id1 == i || id2 == i){
+            do{
+                unsigned long int r = gsl_rng_get( rnd.rid );
+                val = var->list[i].x + ( (r % 2 )? 1 : -1) * sigma ;
+            }while( val > var->list[i].xu || val < var->list[i].xl );
+            nb->list[i].val = val ;
+        }
+        else
+            nb->list[i].val = var->list[i].x;
       
-      //nb->list[i].val = best[i];
       printf("  [%f]  ", nb->list[i].val); 
-		}
-    printf("\r\n"); 
 	}
+    printf("\r\n"); 
 }
+
+
 
 void heuristics_get_neighbor( decisionVar_t* var, neighbor_t* nbh )
 {
@@ -221,6 +255,11 @@ int heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle ){
 
   return SML_CONTINUE;
 }
+
+double heuristics_get_objetive( statusVar_t* st ){
+    return st->dist;
+}
+
 
 void heutistics_print_point( decisionVar_t* var ){
 

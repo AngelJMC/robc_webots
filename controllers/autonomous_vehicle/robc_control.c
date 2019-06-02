@@ -13,7 +13,7 @@ enum{
 };
 
 
-void robc_startEngine( void ) {
+void robc_control_init( void ) {
     wbu_driver_init();
     wbu_driver_set_hazard_flashers(true);
     wbu_driver_set_dipped_beams(true);

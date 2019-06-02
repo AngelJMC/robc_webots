@@ -26,7 +26,7 @@ struct speedcrl{
 
 };
 
-void robc_startEngine( void );
+void robc_control_init( void );
 void set_speed( struct speedcrl* speedcrl, double yellow_line_angle );
 void set_steering_angle( struct pid_param* pid, double yellow_line_angle );
 void init_speedParam(  struct speedcrl* spc, double a, double b, double brakelimit);
