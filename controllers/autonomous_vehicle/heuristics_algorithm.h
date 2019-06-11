@@ -11,9 +11,9 @@ enum{
 };
 
 enum{
-  POINTS_NBH = 20,
-  NORMAL_ITER_IN_NBH = 9,
-  MAX_ITER_IN_NBH = 11,
+  POINTS_NBH = 5,
+  NORMAL_ITER_IN_NBH = 7,
+  MAX_ITER_IN_NBH = 9,
 };
 
 enum{

@@ -401,7 +401,7 @@ int main(int argc, char **argv) {
             tabulist_print( &htbu );
             restart_search = true;
             
-            if ( !res ) {
+            if ( tabulist_isfull( &htbu  ) || !res ) {
                 printf("\r\n -------- End simulation ------\r\n"); 
                 return 0;
             }

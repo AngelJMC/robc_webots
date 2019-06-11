@@ -67,6 +67,15 @@ bool tabulist_isinlist( tabuhdlr_t* htbu, decisionVar_t* dvar ){
     return inrange;
 }
 
+bool tabulist_isfull( tabuhdlr_t* htbu  )
+{
+    if( ( htbu->front == 0 && htbu->rear == TABU_LIST_SIZE - 1 ) 
+            || ( htbu->front == htbu->rear+1 ) ){
+        printf("\nTaboo list is Full! Insertion not possible!!!\n");
+        return true;
+    }
+    return false;
+}
 
 bool tabulist_insert( tabuhdlr_t* htbu , decisionVar_t* dvar, double dist )
 {

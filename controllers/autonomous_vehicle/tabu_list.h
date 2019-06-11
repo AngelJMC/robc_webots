@@ -10,7 +10,7 @@
 
 
 enum{
-    TABU_LIST_SIZE = 15,
+    TABU_LIST_SIZE = 5,
     TABU_THRESHOLD = 25,
 };
 
@@ -38,5 +38,6 @@ void tabulist_print( tabuhdlr_t* htbu );
 
 bool tabulist_isinlist( tabuhdlr_t* htbu, decisionVar_t* dvar );
 
+bool tabulist_isfull( tabuhdlr_t* htbu  );
 
 #endif /*TABU_LIST_H*/
