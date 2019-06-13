@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "assert.h": "c",
-        "gsl_randist.h": "c",
-        "gsl_rng.h": "c",
-        "time.h": "c",
-        "tabu_list.h": "c"
-    }
-}

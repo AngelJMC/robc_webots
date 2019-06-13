@@ -40,9 +40,9 @@
 #include <float.h>
 
 #include "heuristics_algorithm.h"
-#include "robc_lane_detection.h"
-#include "robc_control.h"
-#include "tabu_list.h"
+#include "../src/robc_lane_detection.h"
+#include "../src/robc_control.h"
+#include "../src/tabu/tabu_list.h"
 
 
 // to be used as array indices
