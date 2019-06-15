@@ -327,8 +327,9 @@ void car_devices_init( struct nodeHdlr* nh )
 int main(int argc, char **argv) {
     
     decisionVar_t decvar;
-    decisionVar_t bestvar;
+    decisionVar_t bestdvar;
     struct nodeHdlr nh;
+    population_t pbest;
     population_t pplt[NPOPULATION];
     couple_t parents[NUM_PARENTS];
     couple_t childs[NUM_CHILDS];
@@ -355,20 +356,19 @@ int main(int argc, char **argv) {
             bestrsl = 0;
             ga_init( &decvar );
             for( int n = 0; n < NPOPULATION; ++n ){
-                bool simres = false;
                 double dist = 0;
                 do{
                     statusVar_t stvar;
                     ga_generaterandMember( &decvar );
                     printf(" -New point:\r\n");
                     heuristics_print_point( &decvar ); 
-                    simres = run_simulation( &nh, &decvar, &stvar );
+                    run_simulation( &nh, &decvar, &stvar );
                     dist = heuristics_get_objetive( &stvar );
                 }while( dist < 400 );
                 printf(" -Register member %d, dist: %f\r\n", n, dist);
                 ga_pushMemberToPopulation( &pplt[n], &decvar, dist );
             }
-            memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
+            memcpy( &bestdvar, &decvar, sizeof( decisionVar_t ) );
         }
         
         
@@ -394,29 +394,29 @@ int main(int argc, char **argv) {
                 num_iter, dist, bestrsl ); 
             
 
-            #if 0    
+                
             if ( dist > bestrsl  &&  simres ){
                 bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
                 if( res ){
-                    bestiter = nbIter;
+                    ga_pushMemberToPopulation( &pbest, &decvar, dist );
                     bestrsl = dist;
-                    break;
                 }
             }  
-            #endif 
+            
         }
 #if 0
         if( !simres  ){
                 restart_search = true;
         }
 #endif
-
+        //ga_getBestMember( &pbest, pplt );
+        
         ga_printpoulation( pplt);
-
+        
         ga_select( parents, pplt );
         ga_cross( childs, parents );
         ga_mutation( childs , &decvar );
-        ga_recombination( pplt, childs );
+        ga_recombination( pplt, childs, &pbest );
 
         #if 0
 

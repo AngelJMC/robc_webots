@@ -2,13 +2,15 @@
 #define HEURISTICS_GA_H
 
 enum{
-    NUM_PARENTS = 10,
-    NUM_CHILDS = NUM_PARENTS
+  NPOPULATION = 10,
 };
 
 enum{
-  NPOPULATION = 10,
+    NUM_PARENTS = NPOPULATION/2,
+    NUM_CHILDS = NUM_PARENTS
 };
+
+
 
 typedef struct{
     union{
@@ -49,10 +51,11 @@ void ga_cross( couple_t* childs, couple_t* prts );
 
 void ga_mutation( couple_t* childs , decisionVar_t* var);
 
-void ga_recombination( population_t * pplt, couple_t* childs );
+void ga_recombination( population_t* pplt, couple_t* childs, population_t* pbestglobal );
 
 void ga_printpoulation( population_t* pplt);
 
+void ga_getBestMember( population_t* pbest, population_t* pplt );
 
 
 
