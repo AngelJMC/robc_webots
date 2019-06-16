@@ -230,7 +230,7 @@ bool check_best_solution( struct nodeHdlr* nh, decisionVar_t* decvar , statusVar
         bool const res = run_simulation( nh, decvar , stvar );
         double const dist = heuristics_get_objetive( stvar );
         printf("        Check %d  -> distante: %f\n",  i +1, dist );
-        if ( (bestdist - dist) > 20.0  || !res ) return false;
+        if ( (bestdist - dist) > 40.0  || !res ) return false;
     }
     return true;
     
@@ -333,13 +333,10 @@ int main(int argc, char **argv) {
     population_t pplt[NPOPULATION];
     couple_t parents[NUM_PARENTS];
     couple_t childs[NUM_CHILDS];
-    //neighbor_t nbh[NVAR];
-    //static tabuhdlr_t htbu;
 
     wb_robot_init();
     car_devices_init( &nh );    // check devices
     robc_control_init();        // start engine
-    //tabulist_init( &htbu );
     
     static int      num_iter = 0;
     static bool     restart_search = true;

@@ -1,17 +1,14 @@
-#include "../src/robc_heuristics.h"
-#include "heuristic_ga.h"
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 #include <assert.h>
 #include <stdlib.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_cdf.h>
+#include <string.h>
 #include <time.h>
 #include <math.h>
-#include <assert.h>
+#include "../src/robc_heuristics.h"
+#include "heuristic_ga.h"
 
 enum{
     verbose = 1
@@ -171,7 +168,7 @@ void mutation_population( population_t* pplt, decisionVar_t const* var ){
 
     for(int i = 0; i < NVAR; ++i ){
         double m = ((double) rand() / (RAND_MAX));
-        if( m < 0.2)
+        if( m < 0.3)
             pplt->dvar.list[i].x = float_rand( var->list[i].xl, var->list[i].xu );
     }
 }
@@ -196,9 +193,7 @@ int RouletteSelection ( population_t const* pplt ){
     }
     
     double const rnd = float_rand( 0.0 , sumres );
-    
     double tempsum = 0;
-    int best = NPOPULATION-1;
     for( int i = 0; i < NPOPULATION; ++i){
         tempsum += pplt[i].res;
         if( tempsum >= rnd ) {
@@ -207,7 +202,7 @@ int RouletteSelection ( population_t const* pplt ){
         }
     }
     
-    return best;
+    return NPOPULATION-1;
 }
 
 void get_crosschilds ( couple_t* childs, couple_t const* prts, decisionVar_t const* best  ){
@@ -231,18 +226,19 @@ void get_crosschilds ( couple_t* childs, couple_t const* prts, decisionVar_t con
                 double const crss = ( j == 0 ) ? 
                     ( alpha * p1->dvar.list[i].x + ( 1.0 - alpha) * p2->dvar.list[i].x ) : 
                     ( ( 1.0 - alpha) * p1->dvar.list[i].x + (alpha) * p2->dvar.list[i].x );
-                #if 0
+            #if 1
                 const bool outrange = crss > best->list[i].xu || crss < best->list[i].xl;
 
                 ch->dvar.list[i].x = outrange ? 
                     float_rand( best->list[i].xl, best->list[i].xu  ) : crss;
-                #endif
+            #else
                 if( crss > best->list[i].xu )
                     ch->dvar.list[i].x = best->list[i].xu;
                 else if( crss < best->list[i].xl )
                     ch->dvar.list[i].x = best->list[i].xl;
                 else
                     ch->dvar.list[i].x = crss;
+            #endif
             }   
         }
     }
