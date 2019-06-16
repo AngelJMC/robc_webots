@@ -276,7 +276,7 @@ bool run_simulation( decisionVar_t* decvar , statusVar_t* stvar )
 
             
             bool const lastCycle = t >= 89.93;
-            int const stopSim = heutistics_evaluate_restrictions( stvar, lastCycle );
+            int const stopSim = heuristics_evaluate_restrictions( stvar, lastCycle );
             if ( stopSim ) {
                 return stopSim == SML_FINISH;
             }
@@ -360,7 +360,7 @@ int main(int argc, char **argv) {
             ++num_iter;
             printf("\nGet neighbor %d from iteration %d\r\n", nbIter , num_iter );
             heuristics_get_neighbor( &decvar, &nbh[nbIter] );
-            heutistics_print_point( &decvar );  
+            heuristics_print_point( &decvar );  
             car_restart_position( &nh );
             bool const simres = run_simulation( &decvar, &stvar );
             double const dist = heuristics_get_objetive( &stvar );

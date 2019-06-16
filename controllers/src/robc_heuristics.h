@@ -57,4 +57,6 @@ double heuristics_get_objetive( statusVar_t* st );
 
 void heuristics_print_point( decisionVar_t* var );
 
+double float_rand( double min, double max );
+
 #endif

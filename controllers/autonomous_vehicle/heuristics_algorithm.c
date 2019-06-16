@@ -31,7 +31,6 @@ static struct rnd rnd;
 void _generate_neighbor_normal( neighbor_t* nb, decisionVar_t* var );
 void _generate_neighbor_random( neighbor_t* nb, decisionVar_t* var ); 
 void _generate_neighbor_close( neighbor_t* nb, decisionVar_t* var );
-double _float_rand( double min, double max );
 int _get_range( decisionVar_t* var );
 
 
@@ -67,27 +66,27 @@ void heuristics_init( decisionVar_t* var ){
 
   data->kp.xl = 0;
   data->kp.xu = 4.0;
-  data->kp.x = _float_rand( data->kp.xl, data->kp.xu );
+  data->kp.x = float_rand( data->kp.xl, data->kp.xu );
 
   
   data->ki.xl = 1.0;
   data->ki.xu = 3.0;
-  data->ki.x = _float_rand( data->ki.xl, data->ki.xu );
+  data->ki.x = float_rand( data->ki.xl, data->ki.xu );
 
   
   data->a.xl = 10.0;
   data->a.xu = 40.0;
-  data->a.x = _float_rand( data->a.xl, data->a.xu );
+  data->a.x = float_rand( data->a.xl, data->a.xu );
 
   
   data->b.xl = 0;
   data->b.xu = 2.0;
-  data->b.x = _float_rand( data->b.xl, data->b.xu );
+  data->b.x = float_rand( data->b.xl, data->b.xu );
 
   
   data->brakelimit.xl = 5.0;
   data->brakelimit.xu = 50.0;
-  data->brakelimit.x = _float_rand( data->brakelimit.xl, data->brakelimit.xu );
+  data->brakelimit.x = float_rand( data->brakelimit.xl, data->brakelimit.xu );
 
   for( int i = 0; i < NVAR; ++i){
     var->list[i].range = 1;
@@ -145,47 +144,6 @@ void heuristics_get_neighbor( decisionVar_t* var, neighbor_t* nbh )
 }
 
 
-int heutistics_evaluate_restrictions( statusVar_t* st, bool finishCycle ){
-  if( verbose ){
-    printf( " ACCEL    -> X: %f, Y: %f, Z: %f\r\n", st->accel.x, st->accel.y, st->accel.z);
-    printf( " DISTANCE -> m: %f\r\n", st->dist);
-    printf( " SPEED    -> Speed: %f\r\n", st->speed );
-    printf( " ANGLE    -> angle: %f\r\n", st->angle );
-  }
-
-  if( st->accel.z < 7.0 ) 
-    ++st->numfail;
-  else
-    if( st->numfail > 0 ){ --st->numfail; }
-  
-  if ( st->angle == UNKNOWN || st->numfail > 1 ){
-    printf( "  Finish simulation by restrictions: %s\n", st->angle == UNKNOWN? "Fail angle detection" : "Fail acceleration" );
-    return SML_ERROR_RESTRICTION;
-  }
-
-  if ( finishCycle ) { 
-    printf( "  Finish simulation by end cycle.\n" );
-    return SML_FINISH;
-  }
-
-  return SML_CONTINUE;
-}
-
-
-double heuristics_get_objetive( statusVar_t* st ){
-    return st->dist;
-}
-
-
-void heutistics_print_point( decisionVar_t* var ){
-
-    printf( "  Point decision var: ");
-    for( int i = 0; i < NVAR; ++i ) {
-      printf( " %f,", var->list[i].x );  
-    }
-    printf( "\r\n");
-}
-
 void heuristics_print_neighborhood( neighbor_t* nbh ){
     
     printf(" %s%s%s%s%s\r\n", 
@@ -207,15 +165,8 @@ void heuristics_print_neighborhood( neighbor_t* nbh ){
 }
 
 
-double _float_rand( double min, double max )
-{
-    double scale = rand() / (double) RAND_MAX; /* [0, 1.0] */
-    return min + scale * ( max - min );      /* [min, max] */
-}
-
-
 int _get_range( decisionVar_t* var ){
-  return var->list[0].range;
+    return var->list[0].range;
 }
 
 
@@ -244,20 +195,18 @@ void _generate_neighbor_normal( neighbor_t* nb, decisionVar_t* var ){
 
 void _generate_neighbor_random( neighbor_t* nb, decisionVar_t* var ) {
 
-
-
     for( int i = 0; i < NVAR; ++i ) {
 		double val = 0;
-        double const sigma = _float_rand( var->list[i].xl, var->list[i].xu );
+        double const sigma = float_rand( var->list[i].xl, var->list[i].xu );
         nb->list[i].devstd = sigma;
-        val = _float_rand( var->list[i].xl, var->list[i].xu );
+        val = float_rand( var->list[i].xl, var->list[i].xu );
         nb->list[i].val = val ;
 	}
 }
 
+
 void _generate_neighbor_close( neighbor_t* nb, decisionVar_t* var ){
   
-
     int const id1 = (gsl_rng_get( rnd.rid ) + (int)var->list[0].x) % NVAR;
     int const id2 = (gsl_rng_get( rnd.rid ) + (int)var->list[3].x) % NVAR;
     for( int i = 0; i < NVAR; ++i ) {

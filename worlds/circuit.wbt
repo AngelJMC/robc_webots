@@ -131,7 +131,6 @@ CurvedRoadSegment {
   rightBorder FALSE
   leftBorder FALSE
   rightBarrier TRUE
-  leftBarrier TRUE
   curvatureRadius 40.5
   totalAngle 0.7854
 }

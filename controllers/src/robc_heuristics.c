@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
+
 
 #define UNKNOWN 99999.99
 
@@ -41,6 +43,13 @@ int heuristics_evaluate_restrictions( statusVar_t* st, bool finishCycle ){
 double heuristics_get_objetive( statusVar_t* st ){
     return st->dist;
 }
+
+double float_rand( double min, double max )
+{
+    double scale = rand() / (double) RAND_MAX; /* [0, 1.0] */
+    return min + scale * ( max - min );      /* [min, max] */
+}
+
 
 void heuristics_print_point( decisionVar_t* var ){
 

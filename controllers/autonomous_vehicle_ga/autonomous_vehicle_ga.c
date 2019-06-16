@@ -348,7 +348,6 @@ int main(int argc, char **argv) {
     /* Run simulation */
     while(true){
         /* Load the value of decision variables from heuristic algorithm */
-        int bestiter = -1;
         
         if( restart_search ){
             printf("  Restart search------------------------------------------------------\r\n");
@@ -393,8 +392,6 @@ int main(int argc, char **argv) {
             printf("  Results from iter %d -> distance: %f, best distance: %f \r\n", 
                 num_iter, dist, bestrsl ); 
             
-
-                
             if ( dist > bestrsl  &&  simres ){
                 bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
                 if( res ){
@@ -404,39 +401,14 @@ int main(int argc, char **argv) {
             }  
             
         }
-#if 0
-        if( !simres  ){
-                restart_search = true;
-        }
-#endif
-        //ga_getBestMember( &pbest, pplt );
-        
+
         ga_printpoulation( pplt);
-        
         ga_select( parents, pplt );
-        ga_cross( childs, parents );
-        ga_mutation( childs , &decvar );
+        ga_cross( childs, parents, &bestdvar );
+        ga_mutation( childs , &bestdvar );
         ga_recombination( pplt, childs, &pbest );
 
         #if 0
-
-       
-        /* Check if in the neighborhood there has been an iteration with better result*/
-        if( bestiter != -1 ){
-            printf("\nDiscovered best solution in neighbor %d -> distance: %f\r\n", bestiter, bestrsl); 
-            heuristics_get_neighbor( &decvar, &nbh[bestiter] );
-            int istabu = tabulist_isinlist( &htbu, &decvar );
-            if( !istabu )
-                memcpy( &bestvar, &decvar, sizeof( decisionVar_t ) );
-            else 
-                restart_search = true;
-            
-        }
-
-        /*If a better solution has not been found in the neighborhood, the search is intensified on the last better solution.*/
-        if( bestiter == -1  && bestrsl != 0.0 ){
-            heuristics_intensify_neighbor_search( &decvar );
-        }
 
         if( heuristics_is_finish_neighbor_search( &decvar ) ){
             /*Reset algorithm and add to taboo list*/
