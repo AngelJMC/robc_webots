@@ -377,17 +377,19 @@ int main(int argc, char **argv) {
         
         /*It is iterated over all members of the neighborhood until the best solution is found. */
         ga_printpoulation( pplt);
-        bool simres = false;
         for( int nbIter = 0; nbIter < NPOPULATION; ++nbIter ){
             
             statusVar_t stvar;
+            struct results* fout = &fl.out; 
+
             ++num_iter;
             printf("\nGet member %d from iteration %d\r\n", nbIter , num_iter );
             ga_get_memberFromPopulation( &decvar, &pplt[nbIter] );
             heuristics_print_point( &decvar );  
+            fout->dvar = &decvar;
 
-            simres |= run_simulation( &nh, &decvar, &stvar );
-            double dist = heuristics_get_objetive( &stvar );
+            bool const simres = fout->simres = run_simulation( &nh, &decvar, &stvar );
+            double dist = fout->res = heuristics_get_objetive( &stvar );
 
             dist = dist >= 400 ? dist : 0.0;
             ga_registerSolution( &pplt[nbIter], dist );
@@ -400,11 +402,12 @@ int main(int argc, char **argv) {
                 if( res ){
                     ga_pushMemberToPopulation( &pbest, &decvar, dist );
                     memcpy( &bestdvar, &decvar, sizeof( decisionVar_t ) );
-                    bestrsl = dist;
+                    fout->bres = bestrsl = dist;
                 }
-            }  
+            }
             
-            robc_fl( &fl, &decvar, dist, bestrsl );
+            /* Save simulation results in file */  
+            robc_fl( &fl );
         }
 
 

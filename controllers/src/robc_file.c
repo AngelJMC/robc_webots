@@ -26,15 +26,18 @@ void robc_init( fl_t* fl, char const* msg){
     FILE *fp;
     fp = fopen( fl->filename, "w" );
     if ( fp != NULL ){
-        fprintf( fp, "timestamp, Kp, Ki, Sa, Sb, Bp, distance, bestdist \r\n");
+        printf("Create file to save results: %s\n", fl->filename);
+        fprintf( fp, "timestamp, Kp, Ki, Sa, Sb, Bp, distance, bestdist, simres \r\n");
         fclose(fp);
     }else{
         printf( " Error open file %s \n", fl->filename );
     }
 }
 
-void robc_fl( fl_t* fl, decisionVar_t* dvar, double res, double bres){
-    FILE *fp;
+void robc_fl( fl_t* fl ){
+    FILE* fp;
+    decisionVar_t const* dvar = fl->out.dvar;
+    struct results const* out = &fl->out;
 
     fp = fopen( fl->filename, "a" );
     fseek(fp, 0, SEEK_END);
@@ -43,7 +46,7 @@ void robc_fl( fl_t* fl, decisionVar_t* dvar, double res, double bres){
         for(int i = 0; i < NVAR; ++i ){
             fprintf( fp, "%f, " , dvar->list[i].x );
         }
-        fprintf( fp, "%f, %f\r\n" , res, bres );
+        fprintf( fp, "%f, %f, %d\r\n" , out->res, out->bres, out->simres );
         fclose(fp);
     }
 
