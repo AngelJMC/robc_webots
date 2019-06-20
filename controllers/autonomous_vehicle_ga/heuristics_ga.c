@@ -7,19 +7,17 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
-#include "../src/robc_heuristics.h"
 #include "heuristic_ga.h"
 
 enum{
     verbose = 1
 };
 
-void mutation_population( population_t* pplt, decisionVar_t const* var );
-int RouletteSelection ( population_t const* pplt );
-void print_couple( couple_t const* prts );
-void print_member( population_t const* pplt);
+void mutation_population( population_t* pplt, decisionVar_t const* var, int ngen, int type );
+int rouletteSelection ( population_t const* pplt );
+void print_member( char const* msg, population_t const* pplt);
 void getBestFromPopulation( population_t* pbest, population_t const* plist );
-void get_crosschilds ( couple_t* childs, couple_t const* prts, decisionVar_t const* best  );
+void get_crosschilds ( couple_t* childs, couple_t const* prts );
 void ga_pcross( couple_t const* childs, couple_t const* prts );
 
 void ga_init( decisionVar_t* var ){
@@ -74,39 +72,40 @@ void ga_registerSolution( population_t* pplt, double res ){
 }
 
 
-void ga_select( couple_t* prts, population_t const* pplt ){
+void ga_select( couple_t prts[], population_t const pplt[] ){
    
     for( int i = 0; i < NUM_PARENTS; ++i){
         for (int j = 0; j < 2; ++j ){
-            int id = RouletteSelection ( pplt );
+            int id = rouletteSelection ( pplt );
             prts[i].list[j]= pplt[id];
         }   
     }
 }
 
 
-void ga_cross( couple_t* childs, couple_t const* prts, decisionVar_t const* bestdvar ){
+void ga_cross( couple_t childs[], couple_t const* prts ){
     
     assert( NUM_PARENTS == NUM_CHILDS);
     for( int i = 0; i < NUM_PARENTS; ++i){
-        get_crosschilds ( &childs[i], &prts[i], bestdvar  );
+        get_crosschilds ( &childs[i], &prts[i] );
         if( 0 < verbose )
             ga_pcross( &childs[i], &prts[i] );
     }
 }
 
 
-void ga_mutation( couple_t* childs , decisionVar_t const* var){
+void ga_mutation( couple_t childs[] , decisionVar_t const* var, int ngen, int type){
     
+    printf(" Num generation: %d\r\n", ngen);
     for( int i = 0; i < NUM_CHILDS; ++i){
         for( int j = 0; j < 2; ++j ){
-            mutation_population( &childs[i].list[j], var );
+            mutation_population( &childs[i].list[j], var, ngen, type );
         }
     }
 }
 
 
-void ga_recombination( population_t* pplt, couple_t const* childs, population_t const* pbestglobal ){
+void ga_recombination( population_t pplt[], couple_t const childs[], population_t const* pbestglobal ){
 
     
     population_t pbest = { 
@@ -125,13 +124,15 @@ void ga_recombination( population_t* pplt, couple_t const* childs, population_t 
 
     int p = (int)float_rand( 0.0 , NPOPULATION-1 ); 
     printf(" Best solution of last generation: %d\r\n", p);
-    print_member( &pbest ); 
+    print_member( "\n", &pbest ); 
     pplt[p] = pbest;
     
+    #if 1
     p = (int)float_rand( 0.0 , NPOPULATION-1 );
     printf(" Best solution of all generation: %d\r\n", p);
-    print_member( pbestglobal ); 
+    print_member( "\n", pbestglobal ); 
     memcpy( &pplt[p], pbestglobal, sizeof(population_t ));
+    #endif
         
     printf(" ----------------\r\n");
 
@@ -157,23 +158,56 @@ void ga_printpoulation( population_t const* pplt){
 
     for( int n = 0; n < NPOPULATION; ++n )
 	{
-        print_member( &pplt[n] );
+        print_member( "\n", &pplt[n] );
     }
 
 }
 
 
+double disruption( double ngen, double y){
 
-void mutation_population( population_t* pplt, decisionVar_t const* var ){
+    enum{
+        b = 5, //No uniform factor
+    };
+    double const s = ((double) rand() / (RAND_MAX));
+    int const gen = fmin( ngen, MAX_GEN );
+    double const r = y * s * pow( 1.0 - (double)gen / MAX_GEN , b ) ;
+    return r;
+}
+
+
+
+
+void mutation_population( population_t* pplt, decisionVar_t const* var, int ngen, int type ){
+
+    double ratio =  1.0 - ( (double) ngen - 1.0 ) / ( MAX_GEN - 1.0);
+    ratio = fmin( fmax( ratio , 0.20), 1.0 );
 
     for(int i = 0; i < NVAR; ++i ){
-        double m = ((double) rand() / (RAND_MAX));
-        if( m < 0.3)
+        double const m = ((double) rand() / (RAND_MAX));
+        
+        if( m >= ratio )
+            continue;
+
+        if( type == MUT_UNIFORM ){    
             pplt->dvar.list[i].x = float_rand( var->list[i].xl, var->list[i].xu );
+        }
+        else if( type == MUT_NOT_UNIFORM ){
+            double const r = ((double) rand() / (RAND_MAX));
+            double diff = 0.0;
+            if ( r < 0.5 ){
+                diff = var->list[i].xu - pplt->dvar.list[i].x;
+                pplt->dvar.list[i].x = pplt->dvar.list[i].x + disruption( ngen, diff);
+            }
+            else{
+                diff = pplt->dvar.list[i].x - var->list[i].xl;
+                pplt->dvar.list[i].x = pplt->dvar.list[i].x - disruption( ngen, diff);
+            }
+        }
     }
 }
 
-void getBestFromPopulation( population_t* pbest, population_t const* plist ){
+void getBestFromPopulation( population_t* pbest, population_t const plist[] ){
     int best = 0;
     double bestres = 0; 
     for( int i = 0; i < NPOPULATION; ++i ){
@@ -186,7 +220,7 @@ void getBestFromPopulation( population_t* pbest, population_t const* plist ){
     printf(" Best solution id %d\r\n", best);
 }
 
-int RouletteSelection ( population_t const* pplt ){
+int rouletteSelection ( population_t const pplt[] ){
     double sumres = 0;
     for( int i = 0; i < NPOPULATION; ++i){
         sumres += pplt[i].res;
@@ -202,63 +236,40 @@ int RouletteSelection ( population_t const* pplt ){
         }
     }
     
-    return NPOPULATION-1;
+    return NPOPULATION - 1;
 }
 
-void get_crosschilds ( couple_t* childs, couple_t const* prts, decisionVar_t const* best  ){
+void get_crosschilds ( couple_t* childs, couple_t const* prts ){
     
-    int k = (int)float_rand( 0.0 , NVAR-1 ); /*Punto de cruce*/
-    double alpha = ((double) rand() / (RAND_MAX)) + 1;
-    assert( 0 <= k && NVAR > k);
-    
-    population_t const* p1 = &prts->list[0];
-    population_t const* p2 = &prts->list[1];
+    double a = ((double) rand() / (RAND_MAX));
+    population_t const* v = &prts->list[0];
+    population_t const* w = &prts->list[1];
 
     for (int j = 0; j < 2 ; ++j){ 
         population_t* ch = &childs->list[j];
         for(int i = 0; i < NVAR; ++i ){
-        
-            if( i < k ){
-                ch->dvar.list[i]  = prts->list[j].dvar.list[i];
-            }
-            else
-            {
-                double const crss = ( j == 0 ) ? 
-                    ( alpha * p1->dvar.list[i].x + ( 1.0 - alpha) * p2->dvar.list[i].x ) : 
-                    ( ( 1.0 - alpha) * p1->dvar.list[i].x + (alpha) * p2->dvar.list[i].x );
-            #if 1
-                const bool outrange = crss > best->list[i].xu || crss < best->list[i].xl;
-
-                ch->dvar.list[i].x = outrange ? 
-                    float_rand( best->list[i].xl, best->list[i].xu  ) : crss;
-            #else
-                if( crss > best->list[i].xu )
-                    ch->dvar.list[i].x = best->list[i].xu;
-                else if( crss < best->list[i].xl )
-                    ch->dvar.list[i].x = best->list[i].xl;
-                else
-                    ch->dvar.list[i].x = crss;
-            #endif
-            }   
+            ch->dvar.list[i].x = ( j == 0 ) ? 
+                ( a * v->dvar.list[i].x + ( 1.0 - a) * w->dvar.list[i].x ) : 
+                ( ( 1.0 - a) * v->dvar.list[i].x + (a) * w->dvar.list[i].x );  
         }
     }
-
 }
 
-void print_member( population_t const* pplt){
+void print_member( char const* msg, population_t const* pplt){
 
         for( int i = 0; i < NVAR; ++i ) {
             printf("  [%f]  ", pplt->dvar.list[i].x );  
         } 
         printf("  [%f]  ", pplt->res );
-        printf("\r\n"); 
+        printf("%s", msg); 
 }
 
-void print_couple( couple_t const* prts ){
+void ga_pcouple( couple_t const* prts ){
     for( int i = 0; i < 2; ++i ){
-        printf("Couple %d\r\n", i +1); 
-        print_member( &prts->list[i] );
+        printf("Couple %d : ", i +1); 
+        print_member( "   ", &prts->list[i] );
     }
+    printf("\n");
 }
 
 void ga_pcross( couple_t const* childs, couple_t const* prts ){
@@ -277,3 +288,6 @@ void ga_pcross( couple_t const* childs, couple_t const* prts ){
     printf("\r\n"); 
 
 }
+
+
+

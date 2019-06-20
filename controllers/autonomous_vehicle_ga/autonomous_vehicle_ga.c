@@ -328,6 +328,8 @@ int main(int argc, char **argv) {
     
     decisionVar_t decvar;
     decisionVar_t bestdvar;
+    decisionVar_t defaultdvar;
+
     struct nodeHdlr nh;
     population_t pbest;
     population_t pplt[NPOPULATION];
@@ -337,7 +339,8 @@ int main(int argc, char **argv) {
     wb_robot_init();
     car_devices_init( &nh );    // check devices
     robc_control_init();        // start engine
-    
+    ga_init( &defaultdvar );
+
     static int      num_iter = 0;
     static bool     restart_search = true;
     static double   bestrsl = 0;
@@ -393,32 +396,29 @@ int main(int argc, char **argv) {
                 bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
                 if( res ){
                     ga_pushMemberToPopulation( &pbest, &decvar, dist );
+                    memcpy( &bestdvar, &decvar, sizeof( decisionVar_t ) );
                     bestrsl = dist;
                 }
             }  
             
         }
 
+
+        int const ngen = num_iter/ NPOPULATION ;
         ga_printpoulation( pplt);
         ga_select( parents, pplt );
-        ga_cross( childs, parents, &bestdvar );
-        ga_mutation( childs , &bestdvar );
+        ga_cross( childs, parents );
+        ga_mutation( childs , &defaultdvar, ngen, MUT_NOT_UNIFORM );
         ga_recombination( pplt, childs, &pbest );
 
-        #if 0
+        printf("\nBest solution: \r\n");
+        heuristics_print_point( &bestdvar );
 
-        if( heuristics_is_finish_neighbor_search( &decvar ) ){
-            /*Reset algorithm and add to taboo list*/
-            int res = tabulist_insert( &htbu , &bestvar, bestrsl );
-            tabulist_print( &htbu );
-            restart_search = true;
-            
-            if ( tabulist_isfull( &htbu  ) || !res ) {
-                printf("\r\n -------- End simulation ------\r\n"); 
-                return 0;
-            }
+        if( ngen >= MAX_GEN){
+            printf("\r\n -------- End simulation ------\r\n"); 
+            break;
         }
-        #endif
+
     }
     
     wb_supervisor_simulation_set_mode( WB_SUPERVISOR_SIMULATION_MODE_PAUSE );

@@ -83,7 +83,7 @@ void set_speed( struct speedcrl* spc, double yellow_line_angle ) {
         kmh =  ( 1.0 - brakecoeff ) * targetSpeed ;
     }
     
-    kmh = fmin( 250.0, fmax( 0.0, kmh ));
+    kmh = fmin( 199.0, fmax( 0.0, kmh ));
     wbu_driver_set_cruising_speed(kmh);
 
     if ( verbose )
