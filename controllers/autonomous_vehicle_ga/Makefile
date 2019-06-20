@@ -18,7 +18,7 @@
 # See documentation in $(WEBOTS_HOME_PATH)/resources/Makefile.include
 
 #INCLUDE += -I "../src"
-C_SOURCES += heuristics_ga.c autonomous_vehicle_ga.c ../src/robc_lane_detection.c ../src/robc_control.c ../src/robc_heuristics.c
+C_SOURCES += heuristics_ga.c autonomous_vehicle_ga.c ../src/robc_lane_detection.c ../src/robc_control.c ../src/robc_heuristics.c ../src/robc_file.c
 
 space :=
 space +=

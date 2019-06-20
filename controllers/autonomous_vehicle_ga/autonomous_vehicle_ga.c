@@ -43,6 +43,7 @@
 #include "heuristic_ga.h"
 #include "../src/robc_lane_detection.h"
 #include "../src/robc_control.h"
+#include "../src/robc_file.h"
 
 
 // to be used as array indices
@@ -336,10 +337,13 @@ int main(int argc, char **argv) {
     couple_t parents[NUM_PARENTS];
     couple_t childs[NUM_CHILDS];
 
+    fl_t fl;
+
     wb_robot_init();
     car_devices_init( &nh );    // check devices
     robc_control_init();        // start engine
     ga_init( &defaultdvar );
+    robc_init( &fl, "simulation_results" );
 
     static int      num_iter = 0;
     static bool     restart_search = true;
@@ -371,7 +375,6 @@ int main(int argc, char **argv) {
         }
         
         
-        //heuristics_generate_neighbor( nbh, &bestvar, bestrsl );
         /*It is iterated over all members of the neighborhood until the best solution is found. */
         ga_printpoulation( pplt);
         bool simres = false;
@@ -401,6 +404,7 @@ int main(int argc, char **argv) {
                 }
             }  
             
+            robc_fl( &fl, &decvar, dist, bestrsl );
         }
 
 
