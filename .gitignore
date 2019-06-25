@@ -8,3 +8,7 @@ controllers/autonomous_vehicle/build/release/
 controllers/autonomous_vehicle_ga/build/release/
 
 *.bin
+
+*.m~
+
+controllers/autonomous_vehicle_ga/autonomous_vehicle_ga

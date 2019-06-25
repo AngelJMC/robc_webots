@@ -170,8 +170,8 @@ double disruption( double ngen, double y){
         b = 5, //No uniform factor
     };
     double const s = ((double) rand() / (RAND_MAX));
-    int const gen = fmin( ngen, MAX_GEN );
-    double const r = y * s * pow( 1.0 - (double)gen / MAX_GEN , b ) ;
+    int const gen = fmin( ngen, MAX_GEN + 50 );
+    double const r = y * s * pow( 1.0 - (double)gen / (MAX_GEN + 50) , b );
     return r;
 }
 
@@ -181,7 +181,7 @@ double disruption( double ngen, double y){
 void mutation_population( population_t* pplt, decisionVar_t const* var, int ngen, int type ){
 
     double ratio =  1.0 - ( (double) ngen - 1.0 ) / ( MAX_GEN - 1.0);
-    ratio = fmin( fmax( ratio , 0.20), 1.0 );
+    ratio = fmin( fmax( ratio , 0.25), 1.0 );
 
     for(int i = 0; i < NVAR; ++i ){
         double const m = ((double) rand() / (RAND_MAX));
@@ -189,10 +189,10 @@ void mutation_population( population_t* pplt, decisionVar_t const* var, int ngen
         if( m >= ratio )
             continue;
 
-        if( type == MUT_UNIFORM ){    
+        if( m < 0.1 ){    
             pplt->dvar.list[i].x = float_rand( var->list[i].xl, var->list[i].xu );
         }
-        else if( type == MUT_NOT_UNIFORM ){
+        else{
             double const r = ((double) rand() / (RAND_MAX));
             double diff = 0.0;
             if ( r < 0.5 ){
@@ -204,6 +204,7 @@ void mutation_population( population_t* pplt, decisionVar_t const* var, int ngen
                 pplt->dvar.list[i].x = pplt->dvar.list[i].x - disruption( ngen, diff);
             }
         }
+        
     }
 }
 

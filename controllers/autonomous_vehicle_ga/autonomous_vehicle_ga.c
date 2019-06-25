@@ -339,20 +339,22 @@ int main(int argc, char **argv) {
 
     fl_t fl;
 
+    
     wb_robot_init();
     car_devices_init( &nh );    // check devices
     robc_control_init();        // start engine
     ga_init( &defaultdvar );
     robc_init( &fl, "simulation_results" );
 
-    static int      num_iter = 0;
-    static bool     restart_search = true;
-    static double   bestrsl = 0;
+    int      num_iter = 0;
+    bool     restart_search = true;
+    double   bestrsl = 0;
 
     /* Run simulation */
-    while(true){
+    int ngen = 0;
+    while( ngen < MAX_GEN ){
         /* Load the value of decision variables from heuristic algorithm */
-        
+            
         if( restart_search ){
             printf("  Restart search------------------------------------------------------\r\n");
             restart_search = false;
@@ -373,12 +375,12 @@ int main(int argc, char **argv) {
             }
             memcpy( &bestdvar, &decvar, sizeof( decisionVar_t ) );
         }
-        
-        
+            
+            
         /*It is iterated over all members of the neighborhood until the best solution is found. */
         ga_printpoulation( pplt);
         for( int nbIter = 0; nbIter < NPOPULATION; ++nbIter ){
-            
+                
             statusVar_t stvar;
             struct results* fout = &fl.out; 
 
@@ -395,8 +397,8 @@ int main(int argc, char **argv) {
             ga_registerSolution( &pplt[nbIter], dist );
 
             printf("  Results from iter %d -> distance: %f, best distance: %f \r\n", 
-                num_iter, dist, bestrsl ); 
-            
+            num_iter, dist, bestrsl ); 
+                
             if ( dist > bestrsl  &&  simres ){
                 bool const res = check_best_solution(  &nh, &decvar , &stvar, dist );
                 if( res ){
@@ -405,13 +407,13 @@ int main(int argc, char **argv) {
                     fout->bres = bestrsl = dist;
                 }
             }
-            
+                
             /* Save simulation results in file */  
             robc_fl( &fl );
         }
 
 
-        int const ngen = num_iter/ NPOPULATION ;
+        ngen = num_iter/ NPOPULATION;
         ga_printpoulation( pplt);
         ga_select( parents, pplt );
         ga_cross( childs, parents );
@@ -420,18 +422,14 @@ int main(int argc, char **argv) {
 
         printf("\nBest solution: \r\n");
         heuristics_print_point( &bestdvar );
-
-        if( ngen >= MAX_GEN){
-            printf("\r\n -------- End simulation ------\r\n"); 
-            break;
-        }
-
     }
-    
+        
+    printf("\r\n -------- End simulation ------\r\n");
+        
     wb_supervisor_simulation_set_mode( WB_SUPERVISOR_SIMULATION_MODE_PAUSE );
     wb_supervisor_simulation_reset(); 
     wbu_driver_cleanup(); 
     wbu_car_cleanup();
-
+    
     return 0;  // ignored
 }
